@@ -1,0 +1,30 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+
+    "editor.rulers": [
+        {
+            "column": 79,
+            "color": "#777777"
+        },
+    ],
+    "editor.tokenColorCustomizations": {
+        "[Visual Studio Dark]": {
+            "functions": "#e5b8ffc9",
+        },
+        "textMateRules": [
+            {
+                "scope": "string.quoted.docstring.multi.python",
+                "settings": {
+                    "foreground": "#aeaea8" //change to your preference
+                }
+            }
+        ]
+    },
+    "ruff.configuration": ".vscode\\ruff.toml",
+
+    "[markdown]": {
+        "editor.wordWrap": "wordWrapColumn",
+        "editor.wordWrapColumn": 79
+    },
+}

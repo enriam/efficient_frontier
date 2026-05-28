@@ -1,0 +1,9 @@
+line-length = 79
+
+[lint]
+select = ["ALL"]
+extend-safe-fixes = ["W291", "W293", "PLR1711"]
+ignore = ["D", "ERA001", "ANN", "C901", "PLR0912", "PLR0915", "DTZ007", "TD", "W291", "W293", "COM812"]
+
+[format]
+preview = false
