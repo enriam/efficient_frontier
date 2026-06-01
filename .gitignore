@@ -1,0 +1,20 @@
+# streamlit secrets
+secrets.toml
+
+# ruff linter/formatter config
+ruff.toml
+
+# markdown linter
+.markdownlint.json
+
+# cache files
+*.pyc
+
+# test files
+*test*
+
+# log files
+*.log
+
+# uv virtual env
+.venv/

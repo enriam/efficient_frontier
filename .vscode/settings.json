@@ -1,13 +1,18 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:conda",
     "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "ruff.configuration": ".vscode\\ruff.toml",
 
     "editor.rulers": [
         {
             "column": 79,
             "color": "#777777"
         },
-    ],
+    {
+    }
+],
+    "editor.wordWrap": "wordWrapColumn",
+    "editor.wordWrapColumn": 79,
     "editor.tokenColorCustomizations": {
         "[Visual Studio Dark]": {
             "functions": "#e5b8ffc9",
@@ -21,7 +26,6 @@
             }
         ]
     },
-    "ruff.configuration": ".vscode\\ruff.toml",
 
     "[markdown]": {
         "editor.wordWrap": "wordWrapColumn",
