@@ -9,8 +9,8 @@ from matplotlib.ticker import PercentFormatter
 
 @dataclass(frozen=False)
 class Asset:
-    mean: float
-    var: float  # Variance
+    ret: float
+    volat: float  # Variance
 
 
 def plot_two_asset_frontier(
@@ -41,66 +41,66 @@ def plot_two_asset_frontier(
     Axes
         The axes object containing the plot.
     """
-    num_portfolios: int = kwargs.get("num_portfolios", 500)
-    efficient_label: str = kwargs.get("portfolio_label", "Portfolio frontier")
-    inefficient_label: str = kwargs.get(
-        "inefficient_label", "Inefficient portfolios"
+    # Get kwargs
+    num_portfolios = kwargs.get("num_portfolios", 500)
+    efficient_label = kwargs.get("efficient_label", "Efficient Portfolios")
+    inefficient_label = kwargs.get(
+        "inefficient_label", "Inefficient Portfolios"
     )
-    min_variance_label: str = kwargs.get(
+    min_variance_label = kwargs.get(
         "min_variance_label",
         "Minimum variance portfolio",
     )
-    x_axis_label: str = kwargs.get("x_axis_label", "Risk, standard deviation")
-    y_axis_label: str = kwargs.get("y_axis_label", "Expected return")
-    plot_title: str = kwargs.get(
+    x_axis_label = kwargs.get("x_axis_label", "Risk, standard deviation")
+    y_axis_label = kwargs.get("y_axis_label", "Expected return")
+    plot_title = kwargs.get(
         "plot_title",
         "Two-Asset Portfolio Efficient Frontier",
     )
 
-    min_variance_color: str = kwargs.get("min_variance_color", "red")
-    inefficient_color: str = kwargs.get("inefficient_color", "grey")
-    efficient_color: str = kwargs.get("efficient_color", "steelblue")
+    efficient_color = kwargs.get("efficient_color", "steelblue")
+    inefficient_color = kwargs.get("inefficient_color", "grey")
+    min_variance_color = kwargs.get("min_variance_color", "blue")
 
+    # Check input values
     if not -1 <= correlation <= 1:
         msg = "Correlation must be between -1 and 1."
         raise ValueError(msg)
 
-    if asset_1.var < 0 or asset_2.var < 0:
-        msg_0 = "Asset variances must be non-negative."
+    if asset_1.volat < 0 or asset_2.volat < 0:
+        msg_0 = "Asset std must be non-negative."
         raise ValueError(msg_0)
 
     if ax is None:
         _, ax = plt.subplots(figsize=(9, 6))
 
-    std_1: float = float(np.sqrt(asset_1.var))
-    std_2: float = float(np.sqrt(asset_2.var))
-    covariance: float = correlation * std_1 * std_2
+    std_1 = asset_1.volat
+    std_2 = asset_2.volat
+    covariance = correlation * std_1 * std_2
 
-    weights_1: np.ndarray = np.linspace(0, 1, num_portfolios)
-    weights_2: np.ndarray = 1 - weights_1
+    weight_1 = np.linspace(0, 1, num_portfolios)
+    weight_2 = 1 - weight_1
 
-    portfolio_returns: np.ndarray = (
-        weights_1 * asset_1.mean + weights_2 * asset_2.mean
+    portfolio_returns = weight_1 * asset_1.ret + weight_2 * asset_2.ret
+
+    portfolio_variances = (
+        weight_1**2 * std_1**2
+        + weight_2**2 * std_2**2
+        + 2 * weight_1 * weight_2 * covariance
     )
 
-    portfolio_variances: np.ndarray = (
-        weights_1**2 * asset_1.var
-        + weights_2**2 * asset_2.var
-        + 2 * weights_1 * weights_2 * covariance
-    )
+    portfolio_risks = np.sqrt(portfolio_variances)
+    min_variance_index = int(np.argmin(portfolio_risks))
 
-    portfolio_risks: np.ndarray = np.sqrt(portfolio_variances)
-    min_variance_index: int = int(np.argmin(portfolio_risks))
+    left_slice = slice(0, min_variance_index + 1)
+    right_slice = slice(min_variance_index, num_portfolios)
 
-    left_slice: slice = slice(0, min_variance_index + 1)
-    right_slice: slice = slice(min_variance_index, num_portfolios)
-
-    left_mean_return: float = float(np.mean(portfolio_returns[left_slice]))
-    right_mean_return: float = float(np.mean(portfolio_returns[right_slice]))
+    left_mean_return = np.mean(portfolio_returns[left_slice])
+    right_mean_return = np.mean(portfolio_returns[right_slice])
 
     if left_mean_return < right_mean_return:
-        inefficient_slice: slice = left_slice
-        efficient_slice: slice = right_slice
+        inefficient_slice = left_slice
+        efficient_slice = right_slice
     else:
         inefficient_slice = right_slice
         efficient_slice = left_slice
@@ -176,16 +176,18 @@ def plot_two_asset_portfolio(  # noqa: PLR0913
         Portfolio risk and portfolio return.
     """
 
-    point_label: str = kwargs.get("point_label", "Selected portfolio")
-    point_color: str = kwargs.get("point_color", "purple")
-    point_marker: str = kwargs.get("point_marker", "^")
-    line_color: str = kwargs.get("line_color", point_color)
+    # Get kwargs
+    point_label = kwargs.get("point_label", "Selected portfolio")
+    point_color = kwargs.get("point_color", "darkorange")
+    point_marker = kwargs.get("point_marker", "D")
+    line_color = kwargs.get("line_color", point_color)
 
+    # Check input values
     if not -1 <= correlation <= 1:
         msg = "Correlation must be between -1 and 1."
         raise ValueError(msg)
 
-    if asset_1.var < 0 or asset_2.var < 0:
+    if asset_1.volat < 0 or asset_2.volat < 0:
         msg_0 = "Asset variances must be non-negative."
         raise ValueError(msg_0)
 
@@ -193,19 +195,19 @@ def plot_two_asset_portfolio(  # noqa: PLR0913
         msg_1 = "Portfolio weights must sum to 1."
         raise ValueError(msg_1)
 
-    std_1: float = float(np.sqrt(asset_1.var))
-    std_2: float = float(np.sqrt(asset_2.var))
-    covariance: float = correlation * std_1 * std_2
+    std_1 = asset_1.volat
+    std_2 = asset_2.volat
+    covariance = correlation * std_1 * std_2
 
-    portfolio_return: float = weight_1 * asset_1.mean + weight_2 * asset_2.mean
+    portfolio_return = weight_1 * asset_1.ret + weight_2 * asset_2.ret
 
-    portfolio_variance: float = (
-        weight_1**2 * asset_1.var
-        + weight_2**2 * asset_2.var
+    portfolio_variance = (
+        weight_1**2 * std_1**2
+        + weight_2**2 * std_2**2
         + 2 * weight_1 * weight_2 * covariance
     )
 
-    portfolio_risk: float = float(np.sqrt(portfolio_variance))
+    portfolio_risk = np.sqrt(portfolio_variance)
 
     ax.scatter(
         portfolio_risk,
@@ -245,3 +247,42 @@ def plot_two_asset_portfolio(  # noqa: PLR0913
     ax.legend()
 
     return portfolio_risk, portfolio_return
+
+
+def calc_two_asset_pf_metrics(
+    asset_1: Asset,
+    asset_2: Asset,
+    weight_1: float,
+    weight_2: float,
+    correlation: float,
+) -> tuple[float, float]:
+    """
+    Calculate portfolio risk and return for a two-asset portfolio.
+
+    Returns
+    -------
+    tuple[float, float]
+        portfolio_risk, portfolio_return
+    """
+
+    if asset_1.volat < 0 or asset_2.volat < 0:
+        msg = "Asset standard deviations must be non-negative."
+        raise ValueError(msg)
+
+    if not -1 <= correlation <= 1:
+        msg_0 = "Correlation must be between -1 and 1."
+        raise ValueError(msg_0)
+
+    pf_return = weight_1 * asset_1.ret + weight_2 * asset_2.ret
+
+    covariance = correlation * asset_1.volat * asset_2.volat
+
+    pf_variance = (
+        weight_1**2 * asset_1.volat**2
+        + weight_2**2 * asset_2.volat**2
+        + 2 * weight_1 * weight_2 * covariance
+    )
+
+    pf_risk = np.sqrt(pf_variance)
+
+    return pf_risk, pf_return
