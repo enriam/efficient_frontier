@@ -20,53 +20,60 @@ st.set_page_config(
 # --- Maintenance check
 utils.check_maintenance_status()
 
+
+# --- Function definitions
+def get_md_file(file_path: str):
+    with open(file_path, encoding="utf-8") as f:  # noqa: PTH123
+        return f.read()
+
+
 # --- Page Deployment
-st.title("Deversificación y correlación")
+st.title("Diversificación y correlación")
 
 text01 = """
-El concepto de "diversificación" siempre ha estado presente en los inversores de forma intuitiva, incluso forma parte de la cultura popular: "nunca pongas todos los huevos en la misma cesta". Lo que Markowitz y la *Modern Portfolio Theory (MPT)* aportaron fue formalizar matemáticamente cómo hacerlo y demostrar que el riesgo de una cartera de inversión no depende solo de la volatilidad de cada activo, sino también de cómo se mueven unos en relación a los otros. Esto último se conoce formalmente como **correlación** entre activos. 
-
-Antes de ver cómo afecta la correlación entre activos a una cartera de inversión es muy útil entender el concepto de "frontera eficiente".
-
-## La frontera eficiente
-
-Supongamos que tenemos dos activos de inversión A y B, que representar una **acción** y un **bono**, y que tienen las siguientes rentabilidades y riesgos:
+El concepto de diversificación siempre ha estado presente en la mente del inversor de manera intuitiva, pero fue Henry Markowitz quien, en 1952, formalizó el concepto matemáticamente y demostró que el riesgo de una cartera de inversión no depende solo del riesgo de cada activo, sino también de cómo se mueven unos activos en relación a los otros. Esto último se conoce como **correlación**. Así nació la Teoría Moderna de Carteras.  
 """
 
 text02 = """
-Si variamos los pesos de cada activo podemos crear distintas carteras: 60%-40%, 70%-30%, 100%-0%, cada una dando una rentabilidad distinta y exponiéndonos a un riesgo distinto. 
+Antes de ver cómo la correlación afecta a una cartera de inversión es útil entender lo que es la "frontera eficiente" y cómo se representa.
 
-La representación gráfica de todas las carteras posibles es la frontera eficiente. Se representa en una gráfica donde el eje X es el riesgo y el eje Y la rentabilidad. 
+## La frontera eficiente
 
-Si cambiamos los pesos de los activos, cambian la rentabilidad y el riesgo de la cartera. 
+Supongamos que tenemos dos activos de inversión A y B, que representan una **acción** y un **bono** con las siguientes características:
 """
 
-# --- CHART 1 -------------------------------------------
-# Portfolio numbers
+text03 = """
+Variando los pesos de cada activo podemos crear distintas carteras: 60%-40%, 70%-30%, 100%-0%, cada una con rentabilidad y riesgo distintos. 
+
+La representación gráfica de todas las carteras posibles con estos dos activos, es decir, todas las combinaciones de pesos, es una linea en la gráfica donde el eje X es el riesgo (volatilidad) y el eje Y la rentabilidad. 
+"""
+
+# --- Two Asset Portfolio
 bond = ef.Asset(ret=0.06, volat=0.07)
 stock = ef.Asset(ret=0.14, volat=0.16)
-corr1 = -0.50
-
-bond_ret = round(bond.ret * 100, 1)
-bond_std = round(bond.volat * 100, 1)
-stock_ret = round(stock.ret * 100, 1)
-stock_std = round(stock.volat * 100, 1)
+corr = -0.50
 
 table = f"""
-|             |Rentabilidad |Riesgo       |Correlación|
-|-------------|-------------|-------------|-----------|
-|**Bono**     |{bond_ret} % |{bond_std} % |           |
-|**Acción**   |{stock_ret} %|{stock_std} %|{corr1}    |
+|             |Rentabilidad                 |Riesgo                         |
+|-------------|-----------------------------|-------------------------------|
+|**Bono**     |{round(bond.ret * 100, 1)} % |{round(bond.volat * 100, 1)} % |
+|**Acción**   |{round(stock.ret * 100, 1)} %|{round(stock.volat * 100, 1)} %|
+
+**Correlación** $\\rho$ = {corr}
 """
 
 st.markdown(text01)
 st.write(" ")
+msg = ":blue[¿Quieres conocer las ecuaciones de Markowitz?]"
+with st.expander(msg):
+    st.markdown(get_md_file("md\\markowitz_1.md"))
+st.markdown(text02)
 st.markdown(table)
 st.write(" ")
-st.markdown(text02)
+st.write(text03)
 st.write(" ")
 
-# Chart 1: changing weights
+# --- CHART 1 ------modifying weights -------------------------------------
 col_a1, _, col_a2, col_a3 = st.columns([3, 0.5, 1, 1])
 with col_a1:
     # st.write("###### Pesos Bono - Acción")
@@ -82,33 +89,20 @@ with col_a1:
         # width="stretch",
     )
 
-
 with col_a2:
     st.metric("**Bono**", f"{weight} %")
 with col_a3:
     st.metric("**Acción**", f"{100 - weight} %")
 
-
 b_weight = weight / 100
 s_weight = 1 - b_weight
-
-# b_std = np.sqrt(bond.volat)
-# s_std = np.sqrt(stock.volat)
-# covariance = corr1 * b_std * s_std
-
-# pf_mean = b_weight * bond.ret + s_weight * stock.ret
-# pf_var = (
-#     b_weight**2 * bond.volat
-#     + s_weight**2 * stock.volat
-#     + 2 * b_weight * s_weight * covariance
-# )
 
 fig1, ax1 = plt.subplots(figsize=(9, 6))
 
 ef.plot_two_asset_frontier(
     asset_1=bond,
     asset_2=stock,
-    correlation=corr1,
+    correlation=corr,
     ax=ax1,
     plot_title="Frontera Eficiente",
     efficient_label="Carteras eficientes",
@@ -123,55 +117,61 @@ ef.plot_two_asset_portfolio(
     asset_2=stock,
     weight_1=b_weight,
     weight_2=s_weight,
-    correlation=corr1,
+    correlation=corr,
     ax=ax1,
-)
-st.write(
-    f"Yeeeea {ef.calc_two_asset_pf_metrics(bond, stock, b_weight, s_weight, corr1)}"
 )
 # ax1.set_xlim(-0.02, stock.volat + 0.02)
 
 st.pyplot(fig1, use_container_width=True)
 
 text03 = """
-La línea gris discontinua representa las carteras ineficientes porque cualquiera de ellas tiene una cartera equivalente en la línea azul que, con el mismo riesgo, da más rentabilidad.
+La línea azul es la **frontera eficiente** y representa las carteras óptimas. La línea gris discontinua representa las carteras ineficientes porque cualquiera de ellas tiene una cartera equivalente en la línea azul que, con el mismo riesgo, da más rentabilidad.
 
-Un aspecto interesante es que la cartera con el mínimo riesgo no es la que está formada por bonos al 100%.
+**Observación 1**: un aspecto interesante que podemos ver en la gráfica es que la cartera con el mínimo riesgo no es la que está formada por bonos al 100%. Esto sería cierto si consideráramos que el bono tiene riesgo 0.
 
-Pero lo que en realidad nos interesa no es decidir los pesos de la cartera. Como inversores debemos decidir el riesgo que estamos dispuestos a asumir, y que las ecuaciones de Markowitz nos digan qué pesos debemos asignar a los activos y qué rentabilidad podemos esperar.
+Normalmente no nos va a interesar decidir los pesos de la cartera. Como inversores debemos decidir el riesgo que estamos dispuestos a asumir. A partir de ahí, resolviendo las ecuaciones de Markowitz encontraremos los pesos óptimos para obtener la máxima rentabilidad posible.
+
+## Cartera de riesgo limitado
+
+Consideremos el riesgo que estamos dispuestos a asumir en nuestra inversión, y queremos saber la cartera óptima que podemos formar con el bono y la acción anteriores. Necesitamos saber los pesos de cada activo para no superar el riesgo tolerable y rentabilidad que podemos esperar de esa cartera.
 """
 st.write(text03)
 st.write(" ")
 
 # --- CHART 2 -------------------------------------------
+# Global Minimum Volatility
+gvm, *_ = ef.min_vol_two_assets(bond.volat, stock.volat, corr)
+
 # st.write("###### Riesgo")
 col_a1, _, col_a2, col_a3 = st.columns([3, 0.5, 1, 1])
 with col_a1:
     # st.write("**Riesgo**")
-    risk = st.slider(
+    pf_risk = st.slider(
         label="**Riesgo**",
-        # min_value=min_volat * 100,
-        min_value=0.0,
+        min_value=gvm * 100,
         max_value=stock.volat * 100,
         value=(stock.volat * 100) / 2,
         step=0.1,
         format="%1.1f%%",
         label_visibility="visible",
     )
-    risk /= 100
-    # weights, ret = ef.calc_weights_for_risk(bond, stock, corr1, risk / 100)
+    pf_risk /= 100
+
+w1, w2 = ef.optimal_two_asset_weights_long_only(bond, stock, corr, pf_risk)
+pf_ret = w1 * bond.ret + w2 * stock.ret
+
 with col_a2:
-    st.metric("**Riesgo**", f"{round(risk * 100, 1)} %")
+    st.metric("**Riesgo**", f"{round(pf_risk * 100, 1)} %")
 with col_a3:
     # st.metric("**Rentabilidad**", f"{round(ret * 100, 1)} %")
-    st.metric("**Rentabilidad**", "pepe")
+    st.metric("**Rentabilidad**", f"{round(pf_ret * 100, 1)} %")
 
 fig2, ax2 = plt.subplots(figsize=(9, 6))
 
 ax2 = ef.plot_two_asset_frontier(
     asset_1=bond,
     asset_2=stock,
-    correlation=corr1,
+    correlation=corr,
     ax=ax2,
     plot_title="Pesos en función del riesgo",
     efficient_label="",
@@ -179,62 +179,81 @@ ax2 = ef.plot_two_asset_frontier(
     x_axis_label="Riesgo",
     y_axis_label="Rentabilidad",
     min_variance_label="",
-    efficient_color="darkgrey",
-    inefficient_color="darkgrey",
-    min_variance_color="navy",
 )
 
+weights_text = f"""
+Bono = {round(w1 * 100, 1)} %
+
+Acción = {round(w2 * 100, 1)} %
+"""
+ax2.scatter(
+    pf_risk,
+    pf_ret,
+    c="darkorange",
+    marker="D",
+    zorder=6,
+    label=f"Cartera riesgo {round(pf_risk * 100, 1)} %",
+)
+ax2.annotate(
+    weights_text,
+    xy=(pf_risk, pf_ret),
+    xycoords="data",
+    xytext=(0.7, 0.1),
+    textcoords="axes fraction",
+    arrowprops={"arrowstyle": "->", "ec": "grey"},
+    bbox={"boxstyle": "square", "fc": "white", "ec": "darkorange", "pad": 0.3},
+)
 # ax2.set_xlim(-0.02, stock.volat + 0.02)
-
-# ax2 = ef.plot_two_asset_frontier(
-#     asset_1=bond,
-#     asset_2=stock,
-#     correlation=corr1,
-#     ax=ax2,
-#     plot_title="Pesos en función del riesgo",
-#     efficient_label="",
-#     inefficient_label="",
-#     x_axis_label="Riesgo",
-#     y_axis_label="Rentabilidad",
-#     min_variance_label="Cartera de mínima volatilidad",
-#     efficient_color="darkorange",
-#     inefficient_color="darkgrey",
-#     min_variance_color="navy",
-# )
-
-# ax2.set_xlim(-0.02, 0.32)
-
+ax2.legend()
 st.pyplot(fig2, use_container_width=True)
 
 
 # --- CHART 3 -------------------------------------------
-st.write("###### Correlación")
-corr2 = st.slider(
-    label="Corr",
-    min_value=-1.0,
-    max_value=1.0,
-    value=0.0,
-    step=0.1,
-    format="%0.1f",
-    label_visibility="collapsed",
-)
+text04 = """
+## Correlación
+
+Hemos visto cómo la frontera eficiente contiene todas las carteras óptimas que podemos formar y cómo cambiando los pesos variamos la rentabilidad y el riesgo de nuestra cartera. También hemos visto que si fijamos el riesgo máximo que queremos asumir, eso fija los pesos de los activos y la rentabilidad que podemos esperar.
+
+Ahora vamos a ver el efecto que la correlación de los activos tiene en una  cartera de inversión. Lo vamos a hacer pintando las fronteras eficientes de dos carteras, ambas con activos que tienen la misma rentabilidad y el mismo riesgo, pero con coeficientes de correlación distintos.
+"""
+
+st.markdown(text04)
+# st.write("###### Correlación")
+col1, _, col2 = st.columns([3, 1, 3])
+with col1:
+    corr1 = st.slider(
+        label="**Correlación Cartera 1**",
+        min_value=-1.0,
+        max_value=1.0,
+        value=-0.5,
+        step=0.1,
+        format="%0.1f",
+        label_visibility="visible",
+    )
+with col2:
+    corr2 = st.slider(
+        label="**Correlación Cartera 2**",
+        min_value=-1.0,
+        max_value=1.0,
+        value=0.5,
+        step=0.1,
+        format="%0.1f",
+        label_visibility="visible",
+    )
 
 fig3, ax3 = plt.subplots(figsize=(9, 6))
 
 ax3 = ef.plot_two_asset_frontier(
     asset_1=bond,
     asset_2=stock,
-    correlation=0.0,
+    correlation=corr1,
     ax=ax3,
     plot_title="Efecto de la correlación",
-    efficient_label="Cartera $\\rho$ = 0.0",
+    efficient_label=f"Cartera $\\rho$ = {corr1}",
     inefficient_label="",
     x_axis_label="Riesgo",
     y_axis_label="Rentabilidad",
     min_variance_label="",
-    efficient_color="darkgrey",
-    inefficient_color="darkgrey",
-    min_variance_color="navy",
 )
 
 ax3 = ef.plot_two_asset_frontier(
@@ -249,10 +268,8 @@ ax3 = ef.plot_two_asset_frontier(
     y_axis_label="Rentabilidad",
     min_variance_label="Cartera de mínima volatilidad",
     efficient_color="darkorange",
-    inefficient_color="darkgrey",
-    min_variance_color="navy",
 )
-
+ax3.legend()
 # ax3.set_xlim(-0.02, 0.32)
 
 st.pyplot(fig3, use_container_width=True)

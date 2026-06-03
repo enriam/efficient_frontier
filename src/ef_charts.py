@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -135,7 +136,7 @@ def plot_two_asset_frontier(
     ax.set_xlabel(x_axis_label)
     ax.set_ylabel(y_axis_label)
     ax.set_title(plot_title)
-    ax.legend()
+    # ax.legend()
     ax.grid(visible=True, alpha=0.3)
 
     return ax
@@ -249,7 +250,7 @@ def plot_two_asset_portfolio(  # noqa: PLR0913
     return portfolio_risk, portfolio_return
 
 
-def calc_two_asset_pf_metrics(
+def calc_two_asset_pf_risk_ret(
     asset_1: Asset,
     asset_2: Asset,
     weight_1: float,
@@ -286,3 +287,199 @@ def calc_two_asset_pf_metrics(
     pf_risk = np.sqrt(pf_variance)
 
     return pf_risk, pf_return
+
+
+def optimal_two_asset_weights_long_only(
+    asset1: Asset,
+    asset2: Asset,
+    corr: float,
+    target_vol: float,
+    tol: float = 1e-12,
+) -> tuple[float, float]:
+    """
+    Calcula los pesos óptimos long-only de una cartera de dos activos.
+
+    Objetivo:
+        maximizar rentabilidad esperada
+
+    Restricciones:
+        w1 + w2 = 1
+        0 <= w1 <= 1
+        0 <= w2 <= 1
+        volatilidad cartera <= target_vol
+
+    Cada activo debe tener:
+        asset.rent   -> rentabilidad esperada
+        asset.volat  -> volatilidad
+
+    Returns
+    -------
+    tuple[float, float]
+        Pesos óptimos (w1, w2).
+    """
+
+    mu1 = asset1.ret
+    mu2 = asset2.ret
+
+    sigma1 = asset1.volat
+    sigma2 = asset2.volat
+
+    rho = corr
+    sigma_t = target_vol
+
+    if sigma1 < 0 or sigma2 < 0 or sigma_t < 0:
+        msg = "Las volatilidades deben ser no negativas."
+        raise ValueError(msg)
+
+    if not -1 <= rho <= 1:
+        msg_0 = "La correlación debe estar entre -1 y 1."
+        raise ValueError(msg_0)
+
+    # Varianza de la cartera:
+    # sigma_p^2(w1) = a*w1^2 + b*w1 + c
+    a = sigma1**2 + sigma2**2 - 2 * rho * sigma1 * sigma2
+    b = 2 * rho * sigma1 * sigma2 - 2 * sigma2**2
+    c = sigma2**2
+
+    candidates = []
+
+    # Extremos long-only: 100% activo 1 y 100% activo 2
+    if sigma1 <= sigma_t + tol:
+        candidates.append((1.0, 0.0))
+
+    if sigma2 <= sigma_t + tol:
+        candidates.append((0.0, 1.0))
+
+    # Soluciones interiores que cumplen exactamente sigma_p = sigma_t
+    # a*w1^2 + b*w1 + c = sigma_t^2
+    if abs(a) > tol:
+        discriminant = b**2 - 4 * a * (c - sigma_t**2)
+
+        if discriminant >= -tol:
+            discriminant = max(discriminant, 0.0)
+            sqrt_disc = math.sqrt(discriminant)
+
+            w1_a = (-b - sqrt_disc) / (2 * a)
+            w1_b = (-b + sqrt_disc) / (2 * a)
+
+            for w1 in (w1_a, w1_b):
+                w2 = 1 - w1
+
+                if -tol <= w1 <= 1 + tol and -tol <= w2 <= 1 + tol:
+                    w1 = min(max(w1, 0.0), 1.0)  # noqa: PLW2901
+                    w2 = 1 - w1
+
+                    pf_volat = portfolio_volatility(w1, sigma1, sigma2, rho)
+                    if pf_volat <= sigma_t + tol:
+                        candidates.append((w1, w2))
+
+    # Si los dos activos juntos permiten una cartera de menor volatilidad,
+    # puede haber una solución factible aunque ningún activo por separado lo
+    # sea.
+    if not candidates:
+        msg = "No existe cartera long-only que cumpla la volatilidad target."
+        raise ValueError(msg)
+
+    # Elegimos la cartera factible con mayor rentabilidad esperada
+    w1_opt, w2_opt = max(candidates, key=lambda w: w[0] * mu1 + w[1] * mu2)
+
+    return w1_opt, w2_opt
+
+
+def portfolio_volatility(w1, sigma1, sigma2, rho):
+    """
+    Volatilidad de una cartera de dos activos usando correlación.
+    """
+
+    w2 = 1 - w1
+
+    var = (
+        w1**2 * sigma1**2
+        + w2**2 * sigma2**2
+        + 2 * w1 * w2 * rho * sigma1 * sigma2
+    )
+
+    return math.sqrt(max(var, 0.0))
+
+
+def min_vol_two_assets(vol1, vol2, corr, tol=1e-12):
+    """
+    Calcula la mínima volatilidad posible de una cartera long-only
+    de dos activos, en función de sus volatilidades y correlación.
+
+    Restricciones:
+        w1 + w2 = 1
+        0 <= w1 <= 1
+        0 <= w2 <= 1
+
+    Parameters
+    ----------
+    vol1 : float
+        Volatilidad del activo 1.
+    vol2 : float
+        Volatilidad del activo 2.
+    corr : float
+        Correlación entre ambos activos.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        mínima volatilidad, peso activo 1, peso activo 2
+    """
+
+    sigma1 = vol1
+    sigma2 = vol2
+    rho = corr
+
+    if sigma1 < 0 or sigma2 < 0:
+        msg = "Las volatilidades deben ser no negativas."
+        raise ValueError(msg)
+
+    if not -1 <= rho <= 1:
+        msg_0 = "La correlación debe estar entre -1 y 1."
+        raise ValueError(msg_0)
+
+    # Caso degenerado: ambos activos sin volatilidad
+    if sigma1 < tol and sigma2 < tol:
+        return 0.0, 0.5, 0.5
+
+    # Varianza:
+    # sigma_p^2(w1) = a*w1^2 + b*w1 + c
+    a = sigma1**2 + sigma2**2 - 2 * rho * sigma1 * sigma2
+    b = 2 * rho * sigma1 * sigma2 - 2 * sigma2**2
+    # c = sigma2**2
+
+    # Si a es cero o casi cero, la función es plana o casi plana.
+    # Evaluamos extremos long-only.
+    if abs(a) < tol:
+        candidates = [0.0, 1.0]
+    else:
+        # Peso que minimiza la varianza sin restricción long-only
+        w1_gmv = -b / (2 * a)
+
+        # Restricción long-only
+        w1_gmv = min(max(w1_gmv, 0.0), 1.0)
+
+        candidates = [w1_gmv, 0.0, 1.0]
+
+    best_w1 = min(
+        candidates,
+        key=lambda w1: portfolio_variance_two_assets(w1, sigma1, sigma2, rho),
+    )
+
+    best_w2 = 1 - best_w1
+
+    min_var = portfolio_variance_two_assets(best_w1, sigma1, sigma2, rho)
+    min_vol = math.sqrt(max(min_var, 0.0))
+
+    return min_vol, best_w1, best_w2
+
+
+def portfolio_variance_two_assets(w1, vol1, vol2, corr):
+    """
+    Varianza de una cartera de dos activos usando correlación.
+    """
+
+    w2 = 1 - w1
+
+    return w1**2 * vol1**2 + w2**2 * vol2**2 + 2 * w1 * w2 * corr * vol1 * vol2
