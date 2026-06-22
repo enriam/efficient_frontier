@@ -1,5 +1,6 @@
 import math
-from dataclasses import dataclass
+
+# from dataclasses import dataclass
 from typing import Any
 
 import matplotlib.pyplot as plt
@@ -7,14 +8,15 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.ticker import PercentFormatter
 
+from src.asset import Asset
 
-@dataclass(frozen=False)
-class Asset:
-    ret: float
-    volat: float  # Variance
+# @dataclass(frozen=False)
+# class Asset:
+#     ret: float
+#     volat: float  # Variance
 
 
-def plot_two_asset_frontier(
+def plot_2a_frontier(
     asset_1: Asset,
     asset_2: Asset,
     correlation: float,
@@ -142,7 +144,7 @@ def plot_two_asset_frontier(
     return ax
 
 
-def plot_two_asset_portfolio(  # noqa: PLR0913
+def scatter_2a_portfolio(  # noqa: PLR0913
     asset_1: Asset,
     asset_2: Asset,
     weight_1: float,
@@ -250,7 +252,7 @@ def plot_two_asset_portfolio(  # noqa: PLR0913
     return portfolio_risk, portfolio_return
 
 
-def calc_two_asset_pf_risk_ret(
+def risk_return_2a_pf(
     asset_1: Asset,
     asset_2: Asset,
     weight_1: float,
@@ -289,7 +291,7 @@ def calc_two_asset_pf_risk_ret(
     return pf_risk, pf_return
 
 
-def optimal_two_asset_weights_long_only(
+def weights_2a_pf_long_only(
     asset1: Asset,
     asset2: Asset,
     corr: float,
@@ -369,7 +371,7 @@ def optimal_two_asset_weights_long_only(
                     w1 = min(max(w1, 0.0), 1.0)  # noqa: PLW2901
                     w2 = 1 - w1
 
-                    pf_volat = portfolio_volatility(w1, sigma1, sigma2, rho)
+                    pf_volat = volatility_2a_pf(w1, sigma1, sigma2, rho)
                     if pf_volat <= sigma_t + tol:
                         candidates.append((w1, w2))
 
@@ -386,7 +388,7 @@ def optimal_two_asset_weights_long_only(
     return w1_opt, w2_opt
 
 
-def portfolio_volatility(w1, sigma1, sigma2, rho):
+def volatility_2a_pf(w1, sigma1, sigma2, rho):
     """
     Volatilidad de una cartera de dos activos usando correlación.
     """
@@ -402,7 +404,7 @@ def portfolio_volatility(w1, sigma1, sigma2, rho):
     return math.sqrt(max(var, 0.0))
 
 
-def min_vol_two_assets(vol1, vol2, corr, tol=1e-12):
+def min_vol_2a_pf(vol1, vol2, corr, tol=1e-12):
     """
     Calcula la mínima volatilidad posible de una cartera long-only
     de dos activos, en función de sus volatilidades y correlación.
@@ -464,18 +466,18 @@ def min_vol_two_assets(vol1, vol2, corr, tol=1e-12):
 
     best_w1 = min(
         candidates,
-        key=lambda w1: portfolio_variance_two_assets(w1, sigma1, sigma2, rho),
+        key=lambda w1: variance_2a_pf(w1, sigma1, sigma2, rho),
     )
 
     best_w2 = 1 - best_w1
 
-    min_var = portfolio_variance_two_assets(best_w1, sigma1, sigma2, rho)
+    min_var = variance_2a_pf(best_w1, sigma1, sigma2, rho)
     min_vol = math.sqrt(max(min_var, 0.0))
 
     return min_vol, best_w1, best_w2
 
 
-def portfolio_variance_two_assets(w1, vol1, vol2, corr):
+def variance_2a_pf(w1, vol1, vol2, corr):
     """
     Varianza de una cartera de dos activos usando correlación.
     """
