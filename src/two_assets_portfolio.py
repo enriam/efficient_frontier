@@ -276,6 +276,14 @@ def risk_return_2a_pf(
         msg_0 = "Correlation must be between -1 and 1."
         raise ValueError(msg_0)
 
+    if not np.isclose(weight_1 + weight_2, 1.0):
+        msg = "Portfolio weights must sum to 1."
+        raise ValueError(msg)
+
+    if weight_1 < 0 or weight_2 < 0:
+        msg = "Portfolio weights must be non-negative."
+        raise ValueError(msg)
+
     pf_return = weight_1 * asset_1.ret + weight_2 * asset_2.ret
 
     covariance = correlation * asset_1.volat * asset_2.volat

@@ -24,6 +24,7 @@ def plot_3a_frontier(  # noqa: PLR0913
     # asset2_label = kwargs.get("asset2_label", "Asset 2")
     # asset3_label = kwargs.get("asset3_label", "Asset 3")
     efficient_label = kwargs.get("efficient_label", "Efficient frontier")
+    inefficient_label = kwargs.get("inefficient_label", "Efficient frontier")
     min_variance_label = kwargs.get(
         "min_variance_label",
         "Minimum variance portfolio",
@@ -124,7 +125,7 @@ def plot_3a_frontier(  # noqa: PLR0913
             color=portfolio_cloud_color,
             alpha=0.25,
             s=10,
-            label=kwargs.get("portfolio_cloud_label", "Possible portfolios"),
+            label=inefficient_label,
         )
 
     ax.plot(
@@ -214,7 +215,8 @@ def weights_3a_pf_long_only(
         msg = "assets must contain exactly 3 Asset objects."
         raise ValueError(msg)
 
-    if len(correlations) != num_assets:
+    num_correlations = 3
+    if len(correlations) != num_correlations:
         msg = "correlations must contain exactly 3 values."
         raise ValueError(msg)
 
@@ -307,3 +309,263 @@ def weights_3a_pf_long_only(
 #     max_portfolio_volat=0.16,
 # )
 # ---
+
+
+def weights_3a_pf_bounds(
+    assets: list[Asset],
+    correlations: list[float],
+    max_portfolio_volat: float,
+    **kwargs: Any,
+) -> tuple[list[float], float]:
+    """
+    Calculate the optimal long-only Markowitz portfolio for three assets.
+
+    Optional kwargs
+    ---------------
+    min_weights:
+        Minimum allowed weights [min_w1, min_w2, min_w3].
+        Defaults to [0.0, 0.0, 0.0].
+    """
+
+    num_assets = 3
+    num_correlations = 3
+
+    min_weights = kwargs.get("min_weights", [0.0, 0.0, 0.0])
+
+    if len(assets) != num_assets:
+        msg = "assets must contain exactly 3 Asset objects."
+        raise ValueError(msg)
+
+    if len(correlations) != num_correlations:
+        msg = "correlations must contain exactly 3 values."
+        raise ValueError(msg)
+
+    if len(min_weights) != num_assets:
+        msg = "min_weights must contain exactly 3 values."
+        raise ValueError(msg)
+
+    if max_portfolio_volat < 0:
+        msg = "max_portfolio_volat must be non-negative."
+        raise ValueError(msg)
+
+    if any(min_weight < 0 for min_weight in min_weights):
+        msg = "Minimum weights must be non-negative."
+        raise ValueError(msg)
+
+    if sum(min_weights) > 1.0:
+        msg = "The sum of minimum weights cannot be greater than 1."
+        raise ValueError(msg)
+
+    returns = np.array([asset.ret for asset in assets], dtype=float)
+    volats = np.array([asset.volat for asset in assets], dtype=float)
+    min_weights_array = np.array(min_weights, dtype=float)
+
+    if np.any(volats < 0):
+        msg = "Asset volatilities must be non-negative."
+        raise ValueError(msg)
+
+    if any(corr < -1 or corr > 1 for corr in correlations):
+        msg = "Correlations must be between -1 and 1."
+        raise ValueError(msg)
+
+    corr12, corr13, corr23 = correlations
+    correlation_matrix = np.array(
+        [
+            [1.0, corr12, corr13],
+            [corr12, 1.0, corr23],
+            [corr13, corr23, 1.0],
+        ]
+    )
+
+    epsilon = 1e-10
+    if np.any(np.linalg.eigvalsh(correlation_matrix) < -epsilon):
+        msg = "The correlation matrix is not valid."
+        raise ValueError(msg)
+
+    covariance_matrix = np.outer(volats, volats) * correlation_matrix
+
+    def portfolio_return(weights: np.ndarray) -> float:
+        return float(weights @ returns)
+
+    def portfolio_volat(weights: np.ndarray) -> float:
+        return float(np.sqrt(weights @ covariance_matrix @ weights))
+
+    def negative_portfolio_return(weights: np.ndarray) -> float:
+        return -portfolio_return(weights)
+
+    constraints = [
+        {
+            "type": "eq",
+            "fun": lambda weights: np.sum(weights) - 1.0,
+        },
+        {
+            "type": "ineq",
+            "fun": lambda weights: (
+                max_portfolio_volat - portfolio_volat(weights)
+            ),
+        },
+    ]
+
+    bounds = [
+        (float(min_weights_array[0]), 1.0),
+        (float(min_weights_array[1]), 1.0),
+        (float(min_weights_array[2]), 1.0),
+    ]
+
+    initial_weights = min_weights_array + (
+        (1.0 - np.sum(min_weights_array)) / num_assets
+    )
+
+    result = minimize(
+        negative_portfolio_return,
+        initial_weights,
+        method="SLSQP",
+        bounds=bounds,
+        constraints=constraints,
+    )
+
+    if not result.success:
+        msg = f"Optimization failed: {result.message}"
+        raise ValueError(msg)
+
+    optimal_weights = result.x
+    optimal_return = portfolio_return(optimal_weights)
+
+    return optimal_weights.tolist(), optimal_return
+
+
+def risk_return_3a_pf(
+    assets: list[Asset],
+    weights: list[float],
+    correlations: list[float],
+) -> tuple[float, float]:
+    """
+    Calculate portfolio risk and return for a three-asset portfolio.
+
+    Parameters
+    ----------
+    assets:
+        List with 3 Asset objects: [asset_1, asset_2, asset_3].
+    weights:
+        List with portfolio weights: [w1, w2, w3].
+    correlations:
+        List with correlations: [corr12, corr13, corr23].
+
+    Returns
+    -------
+    tuple[float, float]
+        portfolio_risk, portfolio_return
+    """
+
+    num_assets = 3
+    num_correlations = 3
+
+    if len(assets) != num_assets:
+        msg = "assets must contain exactly 3 Asset objects."
+        raise ValueError(msg)
+
+    if len(weights) != num_assets:
+        msg = "weights must contain exactly 3 values."
+        raise ValueError(msg)
+
+    if len(correlations) != num_correlations:
+        msg = "correlations must contain exactly 3 values."
+        raise ValueError(msg)
+
+    if any(asset.volat < 0 for asset in assets):
+        msg = "Asset standard deviations must be non-negative."
+        raise ValueError(msg)
+
+    if any(corr < -1 or corr > 1 for corr in correlations):
+        msg = "Correlations must be between -1 and 1."
+        raise ValueError(msg)
+
+    if not np.isclose(sum(weights), 1.0):
+        msg = "Portfolio weights must sum to 1."
+        raise ValueError(msg)
+
+    corr12, corr13, corr23 = correlations
+
+    returns = np.array([asset.ret for asset in assets], dtype=float)
+    volats = np.array([asset.volat for asset in assets], dtype=float)
+    weights_array = np.array(weights, dtype=float)
+
+    correlation_matrix = np.array(
+        [
+            [1.0, corr12, corr13],
+            [corr12, 1.0, corr23],
+            [corr13, corr23, 1.0],
+        ]
+    )
+
+    epsilon = 1e-10
+    if np.any(np.linalg.eigvalsh(correlation_matrix) < -epsilon):
+        msg = "The correlation matrix is not valid."
+        raise ValueError(msg)
+
+    covariance_matrix = np.outer(volats, volats) * correlation_matrix
+
+    pf_return = float(weights_array @ returns)
+    pf_variance = float(weights_array @ covariance_matrix @ weights_array)
+    pf_risk = float(np.sqrt(pf_variance))
+
+    return pf_risk, pf_return
+
+
+def scatter_3a_portfolio(
+    pf_risk: float,
+    pf_return: float,
+    ax: Axes,
+    **kwargs: Any,
+) -> Axes:
+    """Plot the risk-return point in the efficient frontier"""
+
+    # Get kwargs
+    point_label = kwargs.get("point_label", "Selected portfolio")
+    point_color = kwargs.get("point_color", "darkorange")
+    point_marker = kwargs.get("point_marker", "D")
+    line_color = kwargs.get("line_color", point_color)
+
+    # Check input values
+    if pf_risk < 0.0:
+        msg = "Portfolio risk must be non-negative"
+        raise ValueError(msg)
+
+    ax.scatter(
+        pf_risk,
+        pf_return,
+        color=point_color,
+        marker=point_marker,
+        label=point_label,
+        zorder=5,
+    )
+
+    x_min, x_max = ax.get_xlim()
+    y_min, y_max = ax.get_ylim()
+
+    ax.vlines(
+        x=pf_risk,
+        ymin=y_min,
+        ymax=pf_return,
+        color=line_color,
+        linestyle=":",
+        linewidth=1,
+        alpha=1.0,
+    )
+
+    ax.hlines(
+        y=pf_return,
+        xmin=x_min,
+        xmax=pf_risk,
+        color=line_color,
+        linestyle=":",
+        linewidth=1,
+        alpha=1.0,
+    )
+
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(y_min, y_max)
+
+    ax.legend()
+
+    return

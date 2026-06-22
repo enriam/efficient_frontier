@@ -6,9 +6,9 @@ import streamlit as st
 import src.three_assets_portfolio as ef3
 import src.two_assets_portfolio as ef2
 from src import utils
-from src.gpt_equalizer import plot_annual_returns
 
-# from src.ef_chart import Asset, plot_two_asset_ef
+# from src.asset import Asset
+from src.gpt_equalizer import plot_annual_returns
 
 # --- Global Config (this must be the first streamlit command in the page)
 st.set_page_config(
@@ -30,7 +30,7 @@ def get_md_file(file_path: str):
 
 
 # --- Page Deployment
-st.title("Diversificación y correlación")
+st.title("Diversificación, correlación y riesgo")
 
 text = """
 El concepto de diversificación siempre ha estado presente en la mente del inversor de manera intuitiva, pues es obvio que invertir todo el dinero en un único activo tiene más riesgo que invertir en diferentes activos. Pero fue Henry Markowitz quien, en 1952, formalizó el concepto matemáticamente, dando lugar al nacimiento de la Teoría Moderna de Carteras. Vamos a explorar la TMC de forma intuitiva, utilizando las menos ecuaciones posibles.
@@ -94,11 +94,14 @@ table1 = f"""
 |-------------|-----------------------------|-------------------------------|
 |**Bono**     |{round(bond.ret * 100, 1)} % |{round(bond.volat * 100, 1)} % |
 |**Acción**   |{round(stock.ret * 100, 1)} %|{round(stock.volat * 100, 1)} %|
-
-Supongamos también (aunque ahora no es relevante) que tienen una **correlación** $\\rho = -${-corr}
 """
-st.markdown(table1)
 
+note = """
+Por ahora no indico la **correlación** entre los activos porque no es necesario para el ejercicio. Más adelante hablaremos en detalle de ella.
+"""
+
+st.markdown(table1)
+st.caption(note)
 
 text = """
 Variando los pesos de cada activo podemos crear distintas carteras: 60%-40%, 70%-30%, 100%-0%, cada una con rentabilidad y riesgo distintos. 
@@ -111,7 +114,7 @@ st.markdown(text)
 st.write(" ")
 
 
-# --- CHART 1 ------modifying weights -------------------------------------
+# --- CHART 1 ------ modifying weights -------------------------------------
 col_a1, _, col_a2, col_a3 = st.columns([3, 0.5, 1, 1])
 with col_a1:
     # st.write("###### Pesos Bono - Acción")
@@ -167,7 +170,7 @@ La línea azul es la **frontera eficiente** y representa las carteras óptimas. 
 
 Aunque lo analizaremos con más detalle un poco más adelante, un aspecto interesante que podemos ver en la gráfica es que la cartera con el mínimo riesgo no es la que está formada por bonos al 100%. Esto es así porque la acción y el bono que hemos elegido tienen correlación negativa, es decir, los riesgos se compensan parcialmente y, por tanto, tener un poco de la acción en la cartera reduce el riesgo más que tener todo al 100% en bonos.
 
-El concepto "frontera" puede parecer un poco innecesario dado que estamos hablando de una línea. Pero vamos a complicar un poco la cartera introduciendo un tercer activo para que se comprenda mejor el concepto.
+El concepto "frontera" puede parecer un poco redundante puesto que estamos hablando de una línea, y no puede haber carteras fuera de esa línea. Pero vamos a añadir un tercer activo para que se comprenda mejor el concepto.
 """
 
 st.markdown(text)
@@ -188,10 +191,9 @@ table2 = f"""
 |**Acción**   |{round(stock.ret * 100, 1)} %|{round(stock.volat * 100, 1)} %|
 |**Bono 2**   |{round(bond2.ret * 100, 1)} %|{round(bond2.volat * 100, 1)} %|
 """
-text = """
-Ignoremos por ahora las **correlaciones**. 
 
-Para que se vea claramente vamos a representar 10.000 carteras combinando los tres activos con diferentes pesos:
+text = """
+Vamos a representar 10.000 carteras combinando los tres activos con diferentes pesos:
 """
 # - $\\rho_{12} = -${-corr_12}
 # - $\\rho_{13}$ = ${corr_13}
@@ -202,6 +204,47 @@ st.markdown(table2)
 st.markdown(text)
 st.write(" ")
 
+# --- Weights selection
+col_a1, _, col_a2, col_a3, col_a4 = st.columns(
+    [3, 0.5, 1, 1, 1], vertical_alignment="center"
+)
+with col_a1:
+    w1 = st.slider(
+        label="**Bono 1**",
+        min_value=0,
+        max_value=100,
+        value=33,
+        step=1,
+        format="%d%%",
+        label_visibility="visible",
+    )
+    w2 = st.slider(
+        label="**Acción**",
+        min_value=0,
+        max_value=100,
+        value=33,
+        step=1,
+        format="%d%%",
+        label_visibility="visible",
+    )
+with col_a2:
+    st.metric("**Bono 1**", f"{w1} %")
+with col_a3:
+    st.metric("**Acción**", f"{w2} %")
+with col_a4:
+    w3 = 100 - w1 - w2
+    st.metric("**Acción**", f"{w3} %")
+st.write(" ")
+
+# -- calculate portfolio risk and return
+pf_risk, pf_ret = ef3.risk_return_3a_pf(
+    assets=[bond, stock, bond2],
+    weights=[w1 / 100, w2 / 100, w3 / 100],
+    correlations=[corr_12, corr_13, corr_23],
+)
+
+
+# -- draw chart
 fig0, ax0 = plt.subplots(figsize=(9, 6))
 
 ax0 = ef3.plot_3a_frontier(
@@ -219,16 +262,18 @@ ax0 = ef3.plot_3a_frontier(
     x_axis_label="Riesgo",
     y_axis_label="Rentabilidad",
 )
+# scatter portfolio selected
+ef3.scatter_3a_portfolio(
+    pf_risk, pf_ret, ax0, point_label="Cartera seleccionada"
+)
 
 st.pyplot(fig0, use_container_width=True)
 
 
 text = """
-Al aumentar el número de activos vemos claramente por qué tiene sentido el concepto de **frontera** eficiente.
+Por ahora hemos hecho un ejercicio variando los pesos de los activos para entender lo que es la frontera eficiente. Hagamos ahora otro ejercicio más interesante desde el punto de vista de un inversor.
 
-Hemos hecho un ejercicio variando los pesos de los activos para entender lo que es la frontera eficiente. Hagamos ahora otro ejercicio más interesante desde el punto de vista de un inversor.
-
-## Cartera de riesgo limitado
+## Cartera con limitación de riesgo
 
 Para simplificar, volvamos a nuestra cartera de sólo dos activos: acción y bono, con los mismos parámetros de rentabilidad, riesgo y correlación. 
 """
@@ -316,6 +361,23 @@ Como es lógico, conforme aumentamos el riesgo que estamos dispuestos a asumir, 
 Y si disminuimos el riesgo de la cartera, se reduce el peso de las acciones, así hasta llegar a la cartera de mínimo riesgo, que tiene un porcentaje pequeño de acciones, pero no cero. Ya hemos explicado que esto es debido a que los activos elegidos tienen correlación negativa. Pero en la siguiente sección veremos esto en detalle.
 """
 st.markdown(text)
+
+# # --- MAX RISK PORTFOLIO WITH 3 ASSETS ----------------------
+# assets = [
+#     Asset(name="Bond1", ret=0.08, volat=0.15),
+#     Asset(name="Stock", ret=0.12, volat=0.22),
+#     Asset(name="Bond2", ret=0.06, volat=0.10),
+# ]
+# correlations = [0.25, 0.10, 0.40]
+
+# weights, expected_return = ef3.weights_3a_pf_bounds(
+#     assets=assets,
+#     correlations=correlations,
+#     max_portfolio_volat=0.16,
+#     min_weights=[0.0, 0.0, 0.0],
+# )
+
+# st.markdown(f"## Weights = {weights}")
 
 
 # --- CHART 3 -------------------------------------------
