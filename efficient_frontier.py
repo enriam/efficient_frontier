@@ -232,7 +232,7 @@ s_weight = 1 - b_weight  # stock asset weight
 
 fig1, ax1 = plt.subplots(figsize=(9, 6))
 
-ef2.plot_2a_frontier(
+ef2.pf_2a_plot_frontier(
     asset_1=bond10y,
     asset_2=sp500,
     correlation=corr_2a,
@@ -246,23 +246,15 @@ ef2.plot_2a_frontier(
 )
 ax1.set_xlim(0.0)
 
-ef2.scatter_2a_portfolio(
-    asset_1=bond10y,
-    asset_2=sp500,
-    weight_1=b_weight,
-    weight_2=s_weight,
-    correlation=corr_2a,
-    ax=ax1,
-    point_label="Cartera seleccionada",
-)
-
 # calculate risk and return for the selected weights
-pf_2a_risk, pf_2a_return = ef2.risk_return_2a_pf(
+pf_2a_risk, pf_2a_return = ef2.pf_2a_risk_return(
+    weight_1=b_weight,
     asset_1=bond10y,
     asset_2=sp500,
-    weight_1=b_weight,
-    weight_2=s_weight,
     correlation=corr_2a,
+)
+ef2.scatter_pf(
+    pf_2a_risk, pf_2a_return, ax1, point_label="Cartera seleccionada"
 )
 
 y_min, y_max = ax1.get_ylim()
@@ -309,7 +301,7 @@ with col1:
 
 fig2, ax2 = plt.subplots(figsize=(9, 6))
 
-ax2 = ef2.plot_2a_frontier(
+ax2 = ef2.pf_2a_plot_frontier(
     asset_1=bond10y,
     asset_2=sp500,
     correlation=corr_2a,
@@ -324,7 +316,7 @@ ax2 = ef2.plot_2a_frontier(
     min_variance_color="darkgrey",
 )
 
-ax2 = ef2.plot_2a_frontier(
+ax2 = ef2.pf_2a_plot_frontier(
     asset_1=bond10y,
     asset_2=sp500,
     correlation=corr1,
@@ -363,7 +355,7 @@ st.write(" ")
 
 # --- CHART 2: Max volatility portfolio
 # calculate Global Minimum Volatility
-gvm, *_ = ef2.min_vol_2a_pf(bond10y.std, sp500.std, corr_2a)
+gvm, *_ = ef2.pf_2a_min_volatility(bond10y.std, sp500.std, corr_2a)
 
 col_a1, _, col_a2, col_a3 = st.columns([3, 0.5, 1, 1])
 with col_a1:
@@ -380,10 +372,8 @@ with col_a1:
     max_risk /= 100
 
 # w1, w2 = ef2.weights_2a_pf_long_only(bond10y, sp500, corr_2a, max_risk)
-w1, w2 = ef2.optimal_two_asset_weights_long_only(
-    bond10y, sp500, corr_2a, max_risk
-)
-pf_ret = w1 * bond10y.avg + w2 * sp500.avg
+w1, w2 = ef2.pf_2a_optimal_weights_long_only(bond10y, sp500, corr_2a, max_risk)
+pf_ret = ef2.pf_2a_return(w1, bond10y.avg, sp500.avg)
 
 with col_a2:
     st.metric("**Riesgo cartera**", f"{round(max_risk * 100, 1)} %")
@@ -393,7 +383,7 @@ with col_a3:
 
 fig3, ax3 = plt.subplots(figsize=(9, 6))
 
-ax3 = ef2.plot_2a_frontier(
+ax3 = ef2.pf_2a_plot_frontier(
     asset_1=bond10y,
     asset_2=sp500,
     correlation=corr_2a,
@@ -414,12 +404,11 @@ ax3.scatter(
     c="darkorange",
     marker="D",
     zorder=6,
-    label=f"Cartera riesgo {round(max_risk * 100, 1)} %",
+    # label=f"Cartera riesgo {round(max_risk * 100, 1)} %",
 )
-weights_text = f"""
-{bond10y.name} = {round(w1 * 100)} %
-{sp500.name} = {round(w2 * 100)} %
-"""
+
+weights_text = f"""{bond10y.name} = {round(w1 * 100)} % \n{sp500.name} = {round(w2 * 100)} %"""
+
 ax3.annotate(
     weights_text,
     xy=(max_risk, pf_ret),
