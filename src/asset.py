@@ -6,5 +6,5 @@ from dataclasses import dataclass
 @dataclass(frozen=False)
 class Asset:
     name: str
-    ret: float  # mean
-    volat: float  # stdev
+    avg: float  # mean
+    std: float  # standard deviation

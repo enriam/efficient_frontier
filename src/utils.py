@@ -97,7 +97,7 @@ def calculate_returns(
     raise ValueError(msg)
 
 
-def load_asset_returns(
+def calculate_asset_returns(
     asset_files: dict[str, str],
     date_column: str = "date",
     price_column: str = "close",
@@ -127,3 +127,30 @@ def load_asset_returns(
         returns_df = returns_df.dropna()
 
     return returns_df
+
+
+def load_asset_prices(
+    asset_files: dict[str, str],
+    date_column: str = "date",
+    price_column: str = "close",
+    *,
+    drop_missing: bool = True,
+) -> pd.DataFrame:
+    """
+    Read asset price files and combine them into one DataFrame.
+    """
+    prices = {}
+
+    for asset_name, file_path in asset_files.items():
+        data = read_price_series(
+            file_path=file_path,
+            date_column=date_column,
+            price_column=price_column,
+        )
+        prices[asset_name] = data
+
+    prices_df = pd.DataFrame(prices)
+    if drop_missing:
+        prices_df = prices_df.dropna()
+
+    return prices_df

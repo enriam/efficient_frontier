@@ -56,7 +56,7 @@ def plot_3a_frontier(  # noqa: PLR0913
         msg = "Correlations must be between -1 and 1."
         raise ValueError(msg)
 
-    if asset_1.volat < 0 or asset_2.volat < 0 or asset_3.volat < 0:
+    if asset_1.std < 0 or asset_2.std < 0 or asset_3.std < 0:
         msg_0 = "Asset standard deviations must be non-negative."
         raise ValueError(msg_0)
 
@@ -65,17 +65,17 @@ def plot_3a_frontier(  # noqa: PLR0913
 
     means = np.array(
         [
-            asset_1.ret,
-            asset_2.ret,
-            asset_3.ret,
+            asset_1.avg,
+            asset_2.avg,
+            asset_3.avg,
         ]
     )
 
     stds = np.array(
         [
-            asset_1.volat,
-            asset_2.volat,
-            asset_3.volat,
+            asset_1.std,
+            asset_2.std,
+            asset_3.std,
         ]
     )
 
@@ -224,8 +224,8 @@ def weights_3a_pf_long_only(
         msg = "max_portfolio_volat must be non-negative."
         raise ValueError(msg)
 
-    returns = np.array([asset.ret for asset in assets], dtype=float)
-    volats = np.array([asset.volat for asset in assets], dtype=float)
+    returns = np.array([asset.avg for asset in assets], dtype=float)
+    volats = np.array([asset.std for asset in assets], dtype=float)
 
     if np.any(volats < 0):
         msg = "Asset volatilities must be non-negative."
@@ -356,8 +356,8 @@ def weights_3a_pf_bounds(
         msg = "The sum of minimum weights cannot be greater than 1."
         raise ValueError(msg)
 
-    returns = np.array([asset.ret for asset in assets], dtype=float)
-    volats = np.array([asset.volat for asset in assets], dtype=float)
+    returns = np.array([asset.avg for asset in assets], dtype=float)
+    volats = np.array([asset.std for asset in assets], dtype=float)
     min_weights_array = np.array(min_weights, dtype=float)
 
     if np.any(volats < 0):
@@ -472,7 +472,7 @@ def risk_return_3a_pf(
         msg = "correlations must contain exactly 3 values."
         raise ValueError(msg)
 
-    if any(asset.volat < 0 for asset in assets):
+    if any(asset.std < 0 for asset in assets):
         msg = "Asset standard deviations must be non-negative."
         raise ValueError(msg)
 
@@ -486,8 +486,8 @@ def risk_return_3a_pf(
 
     corr12, corr13, corr23 = correlations
 
-    returns = np.array([asset.ret for asset in assets], dtype=float)
-    volats = np.array([asset.volat for asset in assets], dtype=float)
+    returns = np.array([asset.avg for asset in assets], dtype=float)
+    volats = np.array([asset.std for asset in assets], dtype=float)
     weights_array = np.array(weights, dtype=float)
 
     correlation_matrix = np.array(

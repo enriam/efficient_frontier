@@ -89,6 +89,7 @@ def plot_annual_returns(
         names = ", ".join(sorted(unknown_kwargs))
         msg = f"unsupported keyword argument(s): {names}"
         raise TypeError(msg)
+
     title = str(kwargs.get("title", "Portfolio Correlations"))
     pf_label = str(kwargs.get("pf_label", "Portfolio"))
 
@@ -109,7 +110,7 @@ def plot_annual_returns(
         ax.plot(
             annual_assets.index,
             annual_assets[asset],
-            linewidth=2,
+            linewidth=1,
             alpha=0.4,
             solid_capstyle="round",
             solid_joinstyle="round",
@@ -118,42 +119,42 @@ def plot_annual_returns(
     ax.plot(
         annual_portfolio.index,
         annual_portfolio,
-        linewidth=5,
+        linewidth=3,
         solid_capstyle="round",
         solid_joinstyle="round",
         color="black",
         label=pf_label,
     )
 
-    maximum = annual_portfolio.max()
-    minimum = annual_portfolio.min()
-    ax.axhline(maximum, color="teal", linewidth=1)
-    ax.axhline(minimum, color="darkred", linewidth=1)
+    # maximum = annual_portfolio.max()
+    # minimum = annual_portfolio.min()
+    # ax.axhline(maximum, color="teal", linewidth=1)
+    # ax.axhline(minimum, color="darkred", linewidth=1)
     ax.axhline(0.0, color="black", linewidth=1)
 
-    label_style = {
-        "transform": ax.get_yaxis_transform(),
-        "ha": "left",
-        "va": "center",
-        "color": "white",
-        "fontweight": "bold",
-        "fontsize": 8,
-        "clip_on": True,
-    }
-    ax.text(
-        0,
-        maximum,
-        "MAX",
-        bbox={"facecolor": "teal", "edgecolor": "teal"},
-        **label_style,
-    )
-    ax.text(
-        0,
-        minimum,
-        "MIN",
-        bbox={"facecolor": "darkred", "edgecolor": "darkred"},
-        **label_style,
-    )
+    # label_style = {
+    #     "transform": ax.get_yaxis_transform(),
+    #     "ha": "left",
+    #     "va": "center",
+    #     "color": "white",
+    #     "fontweight": "bold",
+    #     "fontsize": 8,
+    #     "clip_on": True,
+    # }
+    # ax.text(
+    #     0,
+    #     maximum,
+    #     "MAX",
+    #     bbox={"facecolor": "teal", "edgecolor": "teal"},
+    #     **label_style,
+    # )
+    # ax.text(
+    #     0,
+    #     minimum,
+    #     "MIN",
+    #     bbox={"facecolor": "darkred", "edgecolor": "darkred"},
+    #     **label_style,
+    # )
 
     first_year = int(annual_assets.index.min())
     last_year = int(annual_assets.index.max())
@@ -163,13 +164,13 @@ def plot_annual_returns(
     ax.set_xlim(
         first_tick, last_tick if first_tick != last_tick else last_tick + 1
     )
-    ax.set_ylim(-0.5, 0.5)
+    ax.set_ylim(-0.50, 0.55)
     ax.set_yticks(np.arange(-0.5, 0.51, 0.1))
     ax.yaxis.set_major_formatter(PercentFormatter(xmax=1, decimals=0))
     ax.spines["bottom"].set_position(("data", -0.5))
     ax.yaxis.set_major_formatter(lambda value, _: f"{value:.0%}")
     ax.set_title(title)
 
-    ax.legend()
+    ax.legend(loc="lower right")
 
     return ax
