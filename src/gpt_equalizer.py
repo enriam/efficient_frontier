@@ -164,13 +164,21 @@ def plot_annual_returns(
     ax.set_xlim(
         first_tick, last_tick if first_tick != last_tick else last_tick + 1
     )
-    ax.set_ylim(-0.50, 0.55)
-    ax.set_yticks(np.arange(-0.5, 0.51, 0.1))
+    ax.set_ylim(-0.50, 0.80)
+    ax.set_yticks(np.arange(-0.5, 0.81, 0.1))
+
     ax.yaxis.set_major_formatter(PercentFormatter(xmax=1, decimals=0))
-    ax.spines["bottom"].set_position(("data", -0.5))
     ax.yaxis.set_major_formatter(lambda value, _: f"{value:.0%}")
+
+    ax.tick_params(axis="both", color="lightgrey", labelcolor="grey")
+
+    ax.spines["bottom"].set_position(("data", -0.5))
+    ax.spines[["top", "bottom", "right", "left"]].set(visible=False)
+
+    ax.grid(visible=True, which="major", axis="y", c="lightgrey", ls=":")
+
     ax.set_title(title)
 
-    ax.legend(loc="lower right")
+    ax.legend(loc="upper right")
 
     return ax

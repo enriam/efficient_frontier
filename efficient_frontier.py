@@ -164,7 +164,7 @@ En la práctica, los activos financieros rara vez tienen correlaciones extremas.
 st.markdown(text)
 
 
-# === Efficient Frontier ========================================
+# === Portfolio calculations ========================================
 text = """
 #### Cálculos para la cartera
 
@@ -419,7 +419,6 @@ ax3.annotate(
     bbox={"boxstyle": "square", "fc": "white", "ec": "darkorange", "pad": 0.3},
 )
 
-ax3.legend()
 st.pyplot(fig3, width="stretch")
 
 text = """
@@ -429,6 +428,119 @@ Y si disminuimos el riesgo de la cartera, se reduce el peso de las acciones, as�
 """
 st.markdown(text)
 
+
+# === MARKOWITZ CALCULATOR ========================================
+st.markdown("## Calculadora Markowitz")
+col_a1, _, col_a2 = st.columns([3, 0.5, 3])
+with col_a1:
+    # st.write(" ")
+    std_a = st.slider(
+        label="**Volatilidad Activo A**",
+        min_value=1,
+        max_value=50,
+        value=10,
+        step=1,
+        format="%d%%",
+        # label_visibility="collapsed",
+    )
+    std_b = st.slider(
+        label="**Volatilidad Activo B**",
+        min_value=1,
+        max_value=50,
+        value=25,
+        step=1,
+        format="%d%%",
+        # label_visibility="collapsed",
+    )
+    corr_ab = st.slider(
+        label="**Correlación A y B**",
+        min_value=-1.0,
+        max_value=1.0,
+        value=0.5,
+        step=0.1,
+        format="%0.1f",
+        # label_visibility="collapsed",
+    )
+
+with col_a2:
+    # st.write(" ")
+    avg_a = st.slider(
+        label="**Rentabilidad Activo A**",
+        min_value=1,
+        max_value=30,
+        value=10,
+        step=1,
+        format="%d%%",
+        # label_visibility="collapsed",
+    )
+    avg_b = st.slider(
+        label="**Rentabilidad Activo B**",
+        min_value=1,
+        max_value=30,
+        value=25,
+        step=1,
+        format="%d%%",
+        # label_visibility="collapsed",
+    )
+    min_std, *_ = ef2.pf_2a_min_volatility(std_a, std_b, corr_ab)
+    max_std = max(std_a, std_b)
+    pf_max_std = st.slider(
+        label="**Cartera: máxima volatilidad permitida**",
+        min_value=round(min_std),
+        max_value=round(max_std),
+        value=round((min_std + max_std) / 2),
+        step=1,
+        format="%d%%",
+        # label_visibility="collapsed",
+    )
+
+asset_a = Asset(name="Activo A", avg=avg_a / 100, std=std_a / 100)
+asset_b = Asset(name="Activo B", avg=avg_b / 100, std=std_b / 100)
+
+w_a, w_b = ef2.pf_2a_optimal_weights_long_only(
+    asset1=asset_a, asset2=asset_b, corr=corr_ab, target_vol=pf_max_std / 100
+)
+
+std_ab, avg_ab = ef2.pf_2a_risk_return(w_a, asset_a, asset_b, corr_ab)
+
+fig4, ax4 = plt.subplots(figsize=(9, 6))
+
+ax4 = ef2.pf_2a_plot_frontier(
+    asset_1=asset_a,
+    asset_2=asset_b,
+    correlation=corr_ab,
+    ax=ax4,
+    plot_title="Calculadora Markowitz",
+    efficient_label="",
+    inefficient_label="",
+    x_axis_label="Riesgo",
+    y_axis_label="Rentabilidad",
+    min_variance_label="",
+)
+ax3.set_xlim(0.0)
+
+ax4.scatter(
+    std_ab,
+    avg_ab,
+    c="darkorange",
+    marker="D",
+    zorder=6,
+    # label=f"Cartera riesgo {round(max_risk * 100, 1)} %",
+)
+
+weights_text = f"""{asset_a.name} = {round(w_a * 100)} % \n{asset_b.name} = {round(w_b * 100)} %"""
+
+ax4.annotate(
+    weights_text,
+    xy=(std_ab, avg_ab),
+    xycoords="data",
+    xytext=(0.7, 0.1),
+    textcoords="axes fraction",
+    arrowprops={"arrowstyle": "->", "ec": "grey"},
+    bbox={"boxstyle": "square", "fc": "white", "ec": "darkorange", "pad": 0.3},
+)
+
+st.pyplot(fig4, width="stretch")
 
 # === EQUALIZER ==================================================
 st.markdown("## Equalizer")
@@ -454,10 +566,10 @@ asset_weights = [0.25, 0.25, 0.25]
 monthly_rets = utils.calculate_asset_returns(asset_files=selected_asset_files)
 monthly_rets = monthly_rets.loc["1970":]
 
-fig4, ax4 = plt.subplots(figsize=(9, 6))
-ax4 = plot_annual_returns(monthly_rets, None, ax4, pf_label="Cartera")
+fig5, ax5 = plt.subplots(figsize=(9, 6))
+ax5 = plot_annual_returns(monthly_rets, None, ax5, pf_label="Cartera")
 
-st.pyplot(fig4, width="stretch")
+st.pyplot(fig5, width="stretch")
 
 
 # --- COPYRIGHT & DISCLAIMER
