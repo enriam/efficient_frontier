@@ -3,7 +3,9 @@
 import matplotlib.pyplot as plt
 import streamlit as st
 
-# import src.three_assets_portfolio as ef3
+import src.plot_3assets as pf3
+import src.three_assets_portfolio as ef3
+import src.three_assets_weights as w3a
 import src.two_assets_portfolio as ef2
 from src import utils
 from src.asset import Asset
@@ -26,12 +28,12 @@ utils.check_maintenance_status()
 data_path = "data/"
 
 asset_files = {
-    "SP500": data_path + "xtnd_SP500_m.csv",
-    "Bond 10Y": data_path + "xtnd_US10Y_m.csv",
-    "Oro": data_path + "xtnd_Gold_m.csv",
-    "Small Caps": data_path + "xtnd_Rus2000_m.csv",
+    # "Bill 3M": data_path + "xtnd_US1-3MO_m.csv",
+    # "Bond 10Y": data_path + "xtnd_US10Y_m.csv",
     "Bond 20Y": data_path + "xtnd_US20Y_m.csv",
-    # "Letras del tesoro": data_path + "xtnd_US1-3MO_m.csv",
+    # "SP500": data_path + "xtnd_SP500_m.csv",
+    "SmallCaps": data_path + "xtnd_Rus2000_m.csv",
+    "Gold": data_path + "xtnd_Gold_m.csv",
 }
 monthly_prices = utils.load_asset_prices(asset_files)
 monthly_returns = monthly_prices.pct_change()
@@ -42,113 +44,117 @@ annual_returns = (
 )
 annual_returns.index = annual_returns.index.year
 
+pf_avg = annual_returns.mean().rename("Rentabilidad")
+pf_std = annual_returns.std().rename("Volatilidad")
+pf_corr = annual_returns.corr()
+pf_corr.index.names = ["Correlación"]
+
+# asset order is bond20y - smallcaps - gold
+corr12 = round(pf_corr.iloc[1, 0], 2)
+corr13 = round(pf_corr.iloc[2, 0], 2)
+corr23 = round(pf_corr.iloc[2, 1], 2)
+
+# bill3m = Asset(
+#     name="Letras 3M",
+#     avg=pf_avg.loc["Bill 3M"],
+#     std=pf_std.loc["Bill 3M"],
+# )
+# bond10y = Asset(
+#     name="Bono 10Y",
+#     avg=pf_avg.loc["Bond 10Y"],
+#     std=pf_std.loc["Bond 10Y"],
+# )
+bond20y = Asset(
+    name="Bono 20Y",
+    avg=pf_avg.loc["Bond 20Y"],
+    std=pf_std.loc["Bond 20Y"],
+)
+# sp500 = Asset(
+#     name="SP500",
+#     avg=pf_avg.loc["SP500"],
+#     std=pf_std.loc["SP500"],
+# )
+smallcaps = Asset(
+    name="SmallCaps",
+    avg=pf_avg.loc["SmallCaps"],
+    std=pf_std.loc["SmallCaps"],
+)
+gold = Asset(
+    name="Oro",
+    avg=pf_avg.loc["Gold"],
+    std=pf_std.loc["Gold"],
+)
 
 # Intro
-st.title("Entendiendo a Markowitz: diversificación, correlación y riesgo")
-
-text = """
-El concepto de diversificación siempre ha estado presente en la mente del inversor de manera intuitiva. Hasta mitad del siglo XX la filosofía de inversión dominante fue seleccionar buenos activos (acciones, bonos, propiedades o negocios) y mantenerlos durante largos periodos. De esta forma el riesgo quedaba distribuido.
-
-Fue Henry Markowitz (premio Nobel de economía en 1990) quien, en un artículo publicado en 1952, formalizó matemáticamente el concepto de riesgo y dio un nuevo significado al concepto de diversificación, propiciando el nacimiento de la Teoría Moderna de Carteras. 
-
-Vamos a internarnos poco a poco en los conceptos que nos propone Markowitz.
-"""
-st.markdown(text)
-
-# Two asset portfolio definitions
-pf_2a = annual_returns.loc[:, ["Bond 10Y", "SP500"]]
-pf_2a_avg = pf_2a.mean().rename("Rent Esperada")
-pf_2a_std = pf_2a.std().rename("Volatilidad")
-pf_2a_corr = pf_2a.corr()
-pf_2a_corr.index.names = ["Correlación"]
-corr_2a = pf_2a_corr.iloc[0, 1]
-
-# Bond and Stock Assets definition
-bond10y = Asset(
-    name="Bono 10Y",
-    avg=pf_2a_avg.loc["Bond 10Y"],
-    std=pf_2a_std.loc["Bond 10Y"],
-)
-sp500 = Asset(
-    name="S&P 500",
-    avg=pf_2a_avg.loc["SP500"],
-    std=pf_2a_std.loc["SP500"],
-)
-
-
-# === Asset Risk & Return ==========================================
-text = """
-## Rentabilidad y riesgo de un activo
-Consideremos los siguientes dos activos financieros: 
-
-- el Bono a 10 años del Tesoro de los Estados Unidos, un bono de referencia mundial
-- el S&P 500, el índice bursátil más importante del mundo
-
-Estas han sido sus rentabilidades anuales desde 1970:
-"""
-st.markdown(text)
-st.dataframe((pf_2a.T * 100).round(1), width="content")
+st.title("Teoría Moderna de Carteras: diversificación, correlación y riesgo")
 
 text = f"""
-Markowitz utilizó las matemáticas estadísticas para definir la rentabilidad y el riesgo de un activo. La **rentabilidad esperada** de un activo sería la media de las rentabilidades históricas, representada por la letra griega mu ($\\mu$):
+El concepto de diversificación siempre ha estado presente en la mente del inversor de manera intuitiva. Hasta mitad del siglo XX la filosofía de inversión dominante fue seleccionar buenos activos (acciones, bonos, propiedades o negocios) y mantenerlos durante largos periodos. De esta forma el riesgo quedaba distribuido. Incluso hoy, muchos inversores particulares crean sus carteras siguiendo esta filosofía.
 
-Por otro lado, las rentabilidades anuales no coinciden con la media, algunas son mayores y otras menores. Esa dispersión se mide con una variable estadística llamada *desviación estándar*, representa por la letra griega sigma ($\\sigma$). 
+Pero hasta los años 50 del siglo XX no hubo ninguna forma de cuantificar el riesgo de las inversiones. Fue en 1952 cuando, Henry Markowitz (premio Nobel de economía en 1990), propuso la primera formalización matemática del concepto de riesgo y dio un nuevo significado al concepto de diversificación.
 
-Markowitz definió el **riesgo** de un activo financiero como su desviación estándar, dando así una medida matemática del riesgo. En el mundo de las inversiones a la desviación estándar se le suele llamar **volatilidad**, una palabra que seguro has oido muchas veces. 
+Propuso un método para crear carteras eficientes (_MVO - Mean Variance Optimization_) que dio lugar al nacimiento de lo que se ha llamado la **Teoría Moderna de Carteras** (_Modern Portfolio Theory_). Una cartera eficiente es la que consigue una rentabilidad objetivo con el mínimo riesgo posible. O también, la que consigue la máxima rentabilidad posible con un riesgo dado.
 
-Para nuestros activos tendríamos los siguientes valores:
+### La frontera eficiente
 
-|            |Rentabilidad                   |Riesgo                         |
-|------------|-------------------------------|-------------------------------|
-|**Bono 10Y**|{round(bond10y.avg * 100, 1)} %|{round(bond10y.std * 100, 1)} %|
-|**S&P 500** |{round(sp500.avg * 100, 1)} %  |{round(sp500.std * 100, 1)} %  |
+Para entender mejor el concepto de cartera eficiente, vamos a considerar tres activos financieros y vamos a representar en una gráfica una muestra de carteras creadas asignando distintos pesos a estos activos. 
 
-Ahora formemos una cartera de inversión con ambos activos.
+Los activos seleccionados son los siguientes:
+
+- Bonos LP: Bono a largo plazo del Gobierno EE.UU. (más de 20 años); dentro del mundo de la renta fija, los bonos de mayor duración son los más volátiles
+- SmallCaps: Empresas de EE.UU. de pequeña capitalización, que en renta variable son empresas más volátiles que las de gran capitalización
+- Oro: un activo alternativo con una volátilidad mayor que los activos anteriores
+
+Estas son sus métricas:
+
+|         |Rentabilidad                    |Volatilidad                       |
+|---------|--------------------------------|----------------------------------|
+|Bonos LP |{round(bond20y.avg * 100, 1)}%  |{round(bond20y.std * 100, 1)}%    |
+|SmallCaps|{round(smallcaps.avg * 100, 1)}%|{round(smallcaps.std * 100, 1)}%  |
+|Oro      |{round(gold.avg * 100, 1)}%     |{round(gold.std * 100, 1)}%       |
+
+Para cada activo las rentabilidad mostrada corresponden a la media de las rentabilidades anuales desde 1970 hasta 2025. Y la volatilidad está calculada, estadísticamente, con la desviación estándar:
 """
 st.markdown(text)
+st.write("")
 
+fig1, ax1 = plt.subplots(figsize=(9, 6))
 
-# === Portfolio Risk & Return ==========================================
+ax1 = ef3.plot_3a_frontier(
+    asset_1=bond20y,
+    asset_2=smallcaps,
+    asset_3=gold,
+    correlation_12=corr12,
+    correlation_13=corr13,
+    correlation_23=corr23,
+    ax=ax1,
+    num_portfolios=10_000,
+    plot_title="Frontera Eficiente",
+    efficient_label="Frontera eficiente",
+    inefficient_label="Carteras ineficientes",
+    min_variance_label="Cartera de mínimo riesgo",
+    x_axis_label="Riesgo (Volatilidad)",
+    y_axis_label="Rentabilidad",
+    show_assets=True,
+    asset_labels=["Bonos LP 100%", "Small Caps 100%", "Oro 100%"],
+)
+
+st.pyplot(fig1, width="stretch")
+
 text = """
-## Rentabilidad y riesgo de una cartera con dos activos
+La línea azul se llama **frontera eficiente** y representa las carteras óptimas o eficientes, las que consiguen la máxima rentabilidad para un riesgo dado, o las que consiguen una rentabilidad dada con un riesgo mínimo. El resto de carteras son carteras posibles, pero no son eficientes.
 
-Para formar una cartera tenemos que asignar pesos ($w$) a cada uno de los activos. Con esto, nuestros activos tendrían estas características:
-
-- Bono 10Y --> $\\mu_1$, $\\sigma_1$, $w_1$
-- S&P 500 ---> $\\mu_2$, $\\sigma_2$, $w_2$
-
-Aplicando la matemática estadísticas, Markowitz introdujo estas fórmulas para calcular la rentabilidad esperada y el riesgo de una cartera formada por dos activos:
+Por último, el punto azul representa la cartera con menor riesgo que podemos crear con estos tres activos. 
 """
 st.markdown(text)
-
-st.latex(r"""\mu_p = w_1 \cdot \mu_1 + w_2 \cdot \mu_2""")
-st.latex(r"""\sigma_p^2 = w_1^2 \cdot \sigma_1^2 + w_2^2 \cdot \sigma_2^2 
-+ 2 \cdot w_1 \cdot w_2 \cdot \rho_{12} \cdot \sigma_1 \cdot \sigma_2""")
-
-text = """
-La rentabilidad esperada de la cartera es bastante obvia, depende de la rentabilidad de cada activo en proporción a su peso en la cartera. Pero lo realmente interesante es el riesgo de la cartera. Vamos a traducir la fórmula a conceptos para verlo mejor:
-"""
-st.markdown(text)
-
-conceptual = r"""
-[riesgo_{cartera}] \propto [riesgo_1]^2 + [riesgo_2]^2 + [correlación (\rho_{12})] \cdot [riesgo_1] \cdot [riesgo_2]
-"""
-st.latex(conceptual)
-
-text = """
-El riesgo de la cartera depende de los riesgo de los activos y de una nueva variable, $\\rho_{12}$ (letra griega rho), que representa la **correlación** entre los activos 1 y 2 de la cartera. Y este nuevo factor es muy importante.
-"""
-text = """
-El riesgo de la cartera depende de los riesgo de los activos y de una nueva variable, $\\rho_{12}$ (letra griega rho), que representa la **correlación** entre los activos 1 y 2 de la cartera. Y este nuevo factor es muy importante.
-"""
-st.markdown(text)
-
 
 # === Correlation ==========================================
-text = """
+text = f"""
 ### Correlación
 
-La correlación es uno de los conceptos más importantes en la teoría de carteras. Es una variable estadística que indica en qué medida  dos activos se mueven a la par, tanto en dirección como en magnitud relativa. Su valor está dentro del intervalo [-1, 1] y se interpreta de la siguiente manera:
+Uno de los conceptos más importantes en la Teoría Moderna de Carteras es la correlación entre activos. El modelo de Markowitz nos enseña que el riesgo de una cartera no solo depende de los riesgo de sus activos, sino también de la correlación entre ellos. 
+
+La correlación es una variable estadística que indica en qué medida dos activos se mueven a la par, tanto en dirección como en magnitud relativa. Su valor está dentro del intervalo [-1, 1] y se interpreta de la siguiente manera:
 
 - $\\rho = +1$: movimiento perfectamente sincronizado. Si el activo 1 sube un 2%, el activo 2 sube proporcionalmente siempre. No hay ningún beneficio de combinarlos.
 - $\\rho = 0$: los movimientos son independientes. Saber qué hizo el activo 1 no te dice nada sobre qué hará el activo 2.
@@ -159,141 +165,37 @@ En la práctica, los activos financieros rara vez tienen correlaciones extremas.
 - correlaciones altas: [0.60, 0.9]
 - correlaciones moderadas: [0.30, 0.60]
 - activos descorrelacionados: [-0.2, +0.25]
-- correlaciones negativas: [-0.6, -0.2] 
+- correlaciones negativas: [-0.6, -0.2]
+
+Por ejemplo, los tres activos seleccionados en nuestra cartera tienen las siguientes correlaciones entre ellos:
+
+|CORRELACIÓN  |Bonos LP |SmallCaps|Oro|
+|-------------|---------|---------|--------|
+|**Bonos LP** |1        |{corr12} |{corr13}|
+|**SmallCaps**|{corr12} |1        |{corr23}|
+|**Oro**      |{corr13} |{corr23} |1       |
+
+La correlación es muy importante porque nos ayuda a reducir el riesgo de nuestra cartera de inversión. Vamos a verlo con la frontera eficiente de una cartera con sólo dos activos: Bonos LP y SmallCaps.
 """
 st.markdown(text)
-
-
-# === Portfolio calculations ========================================
-text = """
-#### Cálculos para la cartera
-
-Volviendo a Markowitz, ahora sabemos que el riesgo de una cartera no depende solamente de los riesgos de sus activos, sino también de la correlación entre ellos. Diversificar ya no es solamente tener activos distintos en la cartera, hay que tener en cuenta sus correlaciones.
-
-Recordemos las varibles de nuestros activos, añadiendo ahora la correlación:
-"""
-st.markdown(text)
-
-
-col_a, col_b, col_c = st.columns([3, 3, 3])
-with col_a:
-    st.dataframe((pf_2a_avg * 100).round(1), width="content")
-with col_b:
-    st.dataframe((pf_2a_std * 100).round(1), width="content")
-with col_c:
-    st.dataframe((pf_2a_corr).round(2), width="content")
-
-text = """
-Ya tenemos casi todos los datos que necesitamos para calcular el riesgo y la rentabilidad esperada de nuestra cartera con el Bono 10Y y el S&P 500. Sólo nos queda decidir qué peso le asignamos a cada activo en la cartera y ya podemos resolver las fórmulas. 
-
-Por ejemplo, si asignamos Bono 10Y un peso $w_1$ = 40% y al S&P 500 un peso $w_2$ = 60%, las ecuaciones de Markowitz nos darían:
-
-- $\\mu_p$ = 9.4 %
-- $\\sigma_p$ = 10.9 %
-
-Pero vamos a hacerlo más interesante, vamos a representar en una gráfica todas las combinaciones de pesos posibles.
-"""
-st.markdown(text)
-
-
-# === Efficient Frontier ========================================
-text = """
-### La frontera eficiente
-
-En el eje X tenemos el riesgo de la cartera ($\\sigma_p$) y en el eje Y la rentabilidad esperada ($\\mu_p$). Cada punto de la línea azul y de la línea gris discontinua representa una cartera posible, es decir, una combinación de pesos $w_1$ y $w_2$ para los activos de la cartera.
-
-La línea gris discontinua representa todas las **carteras ineficientes**. Son ineficientes porque en la linea azul hay una cartera que, asumiendo el mismo riesgo, proporciona una rentabilidad mayor. La línea azul, por tanto representa las **carteras eficientes**.
-
-Puedes seleccionar tu propia cartera cambiando los pesos de los activos con el deslizador para ver rentabilidad y riesgo obtendrías.
-"""
-st.markdown(text)
-
-# --- CHART 1: efficient frotier modifying weights
-col_a1, _, col_a2, col_a3 = st.columns([3, 0.5, 1, 1])
-with col_a1:
-    st.write(" ")
-    weight = st.slider(
-        label=f"**Peso {bond10y.name}**",
-        min_value=0,
-        max_value=100,
-        value=40,
-        step=1,
-        format="%d%%",
-        # label_visibility="collapsed",
-    )
-
-with col_a2:
-    st.metric(f"**{bond10y.name}**", f"{weight} %")
-with col_a3:
-    st.metric(f"**{sp500.name}**", f"{100 - weight} %")
-
-b_weight = weight / 100  # bond asset weight
-s_weight = 1 - b_weight  # stock asset weight
-
-fig1, ax1 = plt.subplots(figsize=(9, 6))
-
-ef2.pf_2a_plot_frontier(
-    asset_1=bond10y,
-    asset_2=sp500,
-    correlation=corr_2a,
-    ax=ax1,
-    plot_title="Frontera Eficiente",
-    efficient_label="Carteras eficientes",
-    inefficient_label="Carteras ineficientes",
-    min_variance_label="Cartera de mínimo riesgo",
-    x_axis_label="Riesgo ($\\sigma_p$)",
-    y_axis_label="Rentabilidad ($\\mu_p$)",
-)
-ax1.set_xlim(0.0)
-
-# calculate risk and return for the selected weights
-pf_2a_risk, pf_2a_return = ef2.pf_2a_risk_return(
-    weight_1=b_weight,
-    asset_1=bond10y,
-    asset_2=sp500,
-    correlation=corr_2a,
-)
-ef2.scatter_pf(
-    pf_2a_risk, pf_2a_return, ax1, point_label="Cartera seleccionada"
-)
-
-y_min, y_max = ax1.get_ylim()
-x_min, x_max = ax1.get_xlim()
-bbox = {"boxstyle": "square", "fc": "orange", "pad": 0.3, "color": "white"}
-
-txt = f"{round(pf_2a_risk * 100, 1)}%"
-ax1.text(x=pf_2a_risk, y=y_min, s=txt, ha="center", bbox=bbox)
-
-txt = f"{round(pf_2a_return * 100, 1)}%"
-ax1.text(x=x_min, y=pf_2a_return, s=txt, ha="center", bbox=bbox)
-
-st.pyplot(fig1, width="stretch")
-
-text = """
-El punto azul representa la cartera de mínimo riesgo. No es posible reducir más el riesgo. **_Puede que te llame la atención que esta cartera de mínimo riesgo no está formada por bonos al 100%. Esto es debido, justamente, a la correlación._**
-"""
-st.markdown(text)
-st.write(" ")
 
 
 # === Correlation and Efficient Frontier =================================
 text = f"""
-## Correlación y frontera eficiente
+### Correlación y frontera eficiente
 
-Hemos hecho un ejercicio variando los pesos de los activos para entender cómo cambia la rentabilidad y el riesgo de la cartera. Hagamos ahora otro ejercicio más interesante. ¿Cómo cambia la frontera eficiente en función de la correlación de los activos?
-
-Vamos a imaginar que la correlación de nuestros dos activos no es la que hemos calculado ($\\rho$ = {round(corr_2a, 2)}), sino otra que vamos a variar a voluntad. Veamos qué pasaría con la frontera eficiente de la cartera. 
+La correlación entre los Bonos LP y las SmallCaps es de {corr12}. ¿Cómo cambiaría la frontera eficiente si la correlación entre estos dos activos fuera distinta? Compruébalo con el deslizador.
 """
-st.markdown(text)
+st.write(text)
 st.write("")
 
 _, col1, _ = st.columns([1, 4, 1])
 with col1:
-    corr1 = st.slider(
+    corr_select = st.slider(
         label="**Correlación**",
         min_value=-1.0,
         max_value=1.0,
-        value=corr_2a,
+        value=corr12,
         step=0.01,
         format="%0.2f",
         label_visibility="visible",
@@ -302,12 +204,12 @@ with col1:
 fig2, ax2 = plt.subplots(figsize=(9, 6))
 
 ax2 = ef2.pf_2a_plot_frontier(
-    asset_1=bond10y,
-    asset_2=sp500,
-    correlation=corr_2a,
+    asset_1=bond20y,
+    asset_2=smallcaps,
+    correlation=corr12,
     ax=ax2,
     plot_title="Efecto de la correlación",
-    efficient_label=f"Cartera $\\rho$ = {round(corr_2a, 2)}",
+    efficient_label=f"Cartera $\\rho$ = {corr12}",
     inefficient_label="",
     x_axis_label="Riesgo",
     y_axis_label="Rentabilidad",
@@ -317,12 +219,12 @@ ax2 = ef2.pf_2a_plot_frontier(
 )
 
 ax2 = ef2.pf_2a_plot_frontier(
-    asset_1=bond10y,
-    asset_2=sp500,
-    correlation=corr1,
+    asset_1=bond20y,
+    asset_2=smallcaps,
+    correlation=corr_select,
     ax=ax2,
     plot_title="Efecto de la correlación",
-    efficient_label=f"Cartera $\\rho$ = {round(corr1, 2)}",
+    efficient_label=f"Cartera $\\rho$ = {corr_select}",
     inefficient_label="",
     x_axis_label="Riesgo",
     y_axis_label="Rentabilidad",
@@ -337,25 +239,78 @@ st.pyplot(fig2, width="stretch")
 text = """
 El efecto fundamental es que, cuando la correlación disminuye, la frontera eficiente se curva hacia la izquierda y hacia arriba. Interpretación: cuando se reduce la correlación podemos conseguir la **misma rentabilidad** pero con **menos riesgo**, o **mayor rentabilidad** con el **mismo riesgo**. 
 
-Esta es la esencia de la diversificación. Diversificar no es solamente tener varios activos en la cartera, sino también tener en cuenta su correlación. Los activos descorrelacionados o correlacionados negativamente nos protegen. 
+Esta es la esencia de la diversificación. Diversificar no es solamente tener varios activos en la cartera, sino también tener en cuenta su correlación. Los activos descorrelacionados o correlacionados negativamente nos protegen de la volatilidad. 
+
+Hagamos ahora un ejercicio sencillo con nuestra cartera de tres activos. Vamos a dibujar la frontera eficiente en dos casos (sin las nubes de carteras ineficientes): 
+
+- **Caso 1**: correlaciones reales
+- **Caso 2**: mismos valores de correlación pero los hacemos positivos
 """
 st.markdown(text)
+st.write("")
+
+fig11, ax11 = plt.subplots(figsize=(9, 6))
+
+ax11 = ef3.plot_3a_frontier(
+    asset_1=bond20y,
+    asset_2=smallcaps,
+    asset_3=gold,
+    correlation_12=corr12,
+    correlation_13=corr13,
+    correlation_23=corr23,
+    ax=ax11,
+    num_portfolios=10_000,
+    plot_title="",
+    efficient_label="Caso 1",
+    inefficient_label="",
+    min_variance_label="",
+    x_axis_label="",
+    y_axis_label="",
+    show_assets=False,
+    show_portfolio_cloud=False,
+    frontier_color="steelblue",
+)
+
+ax11 = ef3.plot_3a_frontier(
+    asset_1=bond20y,
+    asset_2=smallcaps,
+    asset_3=gold,
+    correlation_12=-corr12,
+    correlation_13=-corr13,
+    correlation_23=-corr23,
+    ax=ax11,
+    num_portfolios=10_000,
+    plot_title="Frontera Eficiente y Correlación",
+    efficient_label="Caso 2",
+    inefficient_label="Carteras ineficientes",
+    min_variance_label="Cartera de mínimo riesgo",
+    x_axis_label="Riesgo (Volatilidad)",
+    y_axis_label="Rentabilidad",
+    show_assets=False,
+    show_portfolio_cloud=False,
+    frontier_color="darkorange",
+)
+st.pyplot(fig11, width="stretch")
 
 
 # === Limited Risk Portfolio ========================================
 text = """
-## Limitación de riesgo en las carteras
+## Limitación del riesgo
 
-Los ejercicios anteriores nos han servido para entender el papel que juegan los pesos de los activos y su correlación en los resultados de la cartera pero, como inversores, lo que realmente nos interesa es limitar el riesgo que estamos dispuesto a asumir.
+La que, quizás, es la pregunta más importante que un inversor debe hacerse es esta: ¿qué nivel de riesgo soy capaz de tolerar? De hecho, en la Unión Europea, cualquier profesional o entidad financiera que ofrezca asesoramiento en materia de inversiones está obligado por ley a realizar un perfil de riesgo al cliente antes de recomendarle cualquier producto financiero.
 
-A partir de ahí, podemos usar las ecuaciones de Markowitz para calcular los pesos óptimos para ese nivel de riesgo. Y con los pesos podemos calcular la rentabilidad esperada de nuestra cartera.
+Las ecuaciones de Markowitz nos pueden servir para encontrar los pesos adecuados de los activos para no superar un nivel de riesgo específico. Vamos a verlo con la cartera de Bonos LP y Small Caps. Luego hablaremos de carteras con más activos.
+
+#### Cartera 2 activos: Bonos LP y Small Caps
+
+Fijemos el máximo riesgo que queremos asumir y veamos cuáles serían los pesos óptimos de nuestros activos. Tengamos en cuenta que el menor riesgo posible es el de la Cartera de Mínima Volatilidad. Y el mayor es el del activo de mayor riesgo, en este caso las Small Caps.
 """
 st.markdown(text)
 st.write(" ")
 
 # --- CHART 2: Max volatility portfolio
 # calculate Global Minimum Volatility
-gvm, *_ = ef2.pf_2a_min_volatility(bond10y.std, sp500.std, corr_2a)
+gvm, *_ = ef2.pf_2a_min_volatility(bond20y.std, smallcaps.std, corr12)
 
 col_a1, _, col_a2, col_a3 = st.columns([3, 0.5, 1, 1])
 with col_a1:
@@ -363,7 +318,7 @@ with col_a1:
     max_risk = st.slider(
         label="**Máximo riesgo asumible**",
         min_value=gvm * 100,
-        max_value=sp500.std * 100,
+        max_value=smallcaps.std * 100,
         value=gvm * 100 * 1.1,
         step=0.1,
         format="%1.1f%%",
@@ -371,9 +326,8 @@ with col_a1:
     )
     max_risk /= 100
 
-# w1, w2 = ef2.weights_2a_pf_long_only(bond10y, sp500, corr_2a, max_risk)
-w1, w2 = ef2.pf_2a_optimal_weights_long_only(bond10y, sp500, corr_2a, max_risk)
-pf_ret = ef2.pf_2a_return(w1, bond10y.avg, sp500.avg)
+w1, w2 = ef2.pf_2a_optimal_weights(bond20y, smallcaps, corr12, max_risk)
+pf_ret = ef2.pf_2a_return(w1, bond20y.avg, smallcaps.avg)
 
 with col_a2:
     st.metric("**Riesgo cartera**", f"{round(max_risk * 100, 1)} %")
@@ -384,9 +338,9 @@ with col_a3:
 fig3, ax3 = plt.subplots(figsize=(9, 6))
 
 ax3 = ef2.pf_2a_plot_frontier(
-    asset_1=bond10y,
-    asset_2=sp500,
-    correlation=corr_2a,
+    asset_1=bond20y,
+    asset_2=smallcaps,
+    correlation=corr12,
     ax=ax3,
     plot_title="Pesos en función del riesgo",
     efficient_label="",
@@ -395,7 +349,6 @@ ax3 = ef2.pf_2a_plot_frontier(
     y_axis_label="Rentabilidad",
     min_variance_label="",
 )
-ax3.set_xlim(0.0)
 
 ax3.scatter(
     # max_risk,
@@ -407,7 +360,7 @@ ax3.scatter(
     # label=f"Cartera riesgo {round(max_risk * 100, 1)} %",
 )
 
-weights_text = f"""{bond10y.name} = {round(w1 * 100)} % \n{sp500.name} = {round(w2 * 100)} %"""
+weights_text = f"""{bond20y.name} = {round(w1 * 100)} % \n{smallcaps.name} = {round(w2 * 100)} %"""
 
 ax3.annotate(
     weights_text,
@@ -422,125 +375,157 @@ ax3.annotate(
 st.pyplot(fig3, width="stretch")
 
 text = """
-Como es lógico, conforme aumentamos el riesgo que estamos dispuestos a asumir, aumenta la proporción de acciones (el activo de mayor riesgo) en la cartera. Y también aumenta la rentabilidad esperada. 
+Como es lógico, conforme aumentamos el riesgo que estamos dispuestos a asumir, aumenta el peso del activo de mayor riesgo. Y también debería aumentar la rentabilidad esperada de la cartera porque, en caso contrario, tenemos un activo con más riesgo pero menos rentabilidad que el otro. Eso sería absurdo. 
 
-Y si disminuimos el riesgo de la cartera, se reduce el peso de las acciones, así hasta llegar a la cartera de mínimo riesgo, que tiene un porcentaje pequeño de acciones, pero no cero. Ya hemos explicado que esto es debido a que los activos elegidos tienen correlación negativa. Pero en la siguiente sección veremos esto en detalle.
+Vamos a repetir el ejercicio con nuestra cartera de tres activos completa y vamos a buscar los pesos óptimos para un nivel de riesgo. Y al mismo tiempo, vamos a representar una cartera muy habitual, la cartera equiponderada (mismos pesos para los tres activos) y a ver lo cerca o lejos que está de la frontera eficiente. 
+
+#### Cartera 3 activos: Bonos LP, Small Caps y Oro
 """
 st.markdown(text)
+st.write("")
 
-
-# === MARKOWITZ CALCULATOR ========================================
-st.markdown("## Calculadora Markowitz")
-col_a1, _, col_a2 = st.columns([3, 0.5, 3])
+# Three Asset Portfolio
+gvm_3a = w3a.global_min_volatility_3a(
+    stds=[bond20y.std, smallcaps.std, gold.std],
+    correlations=[corr12, corr13, corr23],
+)
+col_a1, _, col_a2, col_a3 = st.columns([3, 0.5, 1, 1])
 with col_a1:
-    # st.write(" ")
-    std_a = st.slider(
-        label="**Volatilidad Activo A**",
-        min_value=1,
-        max_value=50,
-        value=10,
-        step=1,
-        format="%d%%",
-        # label_visibility="collapsed",
-    )
-    std_b = st.slider(
-        label="**Volatilidad Activo B**",
-        min_value=1,
-        max_value=50,
-        value=25,
-        step=1,
-        format="%d%%",
-        # label_visibility="collapsed",
-    )
-    corr_ab = st.slider(
-        label="**Correlación A y B**",
-        min_value=-1.0,
-        max_value=1.0,
-        value=0.5,
+    # st.write("**Riesgo**")
+    max_3a_risk = st.slider(
+        label="**Máximo riesgo**",
+        min_value=gvm_3a * 100,
+        max_value=smallcaps.std * 100,
+        value=(gvm_3a + abs(gvm_3a - smallcaps.std) / 2) * 100,
         step=0.1,
-        format="%0.1f",
-        # label_visibility="collapsed",
+        format="%1.1f%%",
+        label_visibility="visible",
     )
+    max_3a_risk /= 100
+
+solution_exists = True
+try:
+    data_dict = w3a.weights_3a_with_max_volatility(
+        assets=[bond20y, smallcaps, gold],
+        correlations=[corr12, corr13, corr23],
+        max_volatility=max_3a_risk,
+    )
+    pf_ret = data_dict["portfolio_return"]
+    w1 = data_dict["weights"][0]
+    w2 = data_dict["weights"][1]
+    w3 = data_dict["weights"][2]
+except RuntimeError:
+    solution_exists = False
+    chart_text = "No hay solución para la cartera"
+    pf_ret = 0.0
+    w1, w2, w3 = 0.0, 0.0, 0.0
 
 with col_a2:
-    # st.write(" ")
-    avg_a = st.slider(
-        label="**Rentabilidad Activo A**",
-        min_value=1,
-        max_value=30,
-        value=10,
-        step=1,
-        format="%d%%",
-        # label_visibility="collapsed",
-    )
-    avg_b = st.slider(
-        label="**Rentabilidad Activo B**",
-        min_value=1,
-        max_value=30,
-        value=25,
-        step=1,
-        format="%d%%",
-        # label_visibility="collapsed",
-    )
-    min_std, *_ = ef2.pf_2a_min_volatility(std_a, std_b, corr_ab)
-    max_std = max(std_a, std_b)
-    pf_max_std = st.slider(
-        label="**Cartera: máxima volatilidad permitida**",
-        min_value=round(min_std),
-        max_value=round(max_std),
-        value=round((min_std + max_std) / 2),
-        step=1,
-        format="%d%%",
-        # label_visibility="collapsed",
-    )
+    st.metric("**Riesgo cartera**", f"{round(max_3a_risk * 100, 1)} %")
+with col_a3:
+    st.metric("**Rent. cartera**", f"{round(pf_ret * 100, 1)} %")
 
-asset_a = Asset(name="Activo A", avg=avg_a / 100, std=std_a / 100)
-asset_b = Asset(name="Activo B", avg=avg_b / 100, std=std_b / 100)
+fig3, ax3 = plt.subplots(figsize=(9, 6))
 
-w_a, w_b = ef2.pf_2a_optimal_weights_long_only(
-    asset1=asset_a, asset2=asset_b, corr=corr_ab, target_vol=pf_max_std / 100
-)
-
-std_ab, avg_ab = ef2.pf_2a_risk_return(w_a, asset_a, asset_b, corr_ab)
-
-fig4, ax4 = plt.subplots(figsize=(9, 6))
-
-ax4 = ef2.pf_2a_plot_frontier(
-    asset_1=asset_a,
-    asset_2=asset_b,
-    correlation=corr_ab,
-    ax=ax4,
-    plot_title="Calculadora Markowitz",
+ax3 = ef3.plot_3a_frontier(
+    asset_1=bond20y,
+    asset_2=smallcaps,
+    asset_3=gold,
+    correlation_12=corr12,
+    correlation_13=corr13,
+    correlation_23=corr23,
+    ax=ax3,
+    num_portfolios=10_000,
+    plot_title="",
     efficient_label="",
     inefficient_label="",
-    x_axis_label="Riesgo",
-    y_axis_label="Rentabilidad",
     min_variance_label="",
+    x_axis_label="",
+    y_axis_label="",
+    show_assets=False,
+    show_portfolio_cloud=False,
+    frontier_color="steelblue",
 )
-ax3.set_xlim(0.0)
 
-ax4.scatter(
-    std_ab,
-    avg_ab,
-    c="darkorange",
-    marker="D",
+weights_text = f"""{bond20y.name} = {round(w1 * 100)} % \n{smallcaps.name} = {round(w2 * 100)} % \n{gold.name} = {round(w3 * 100)} %"""
+
+if solution_exists:
+    ax3.scatter(
+        # max_risk,
+        max_3a_risk,
+        pf_ret,
+        c="darkorange",
+        marker="D",
+        zorder=6,
+    )
+
+    ax3.annotate(
+        weights_text,
+        xy=(max_3a_risk, pf_ret),
+        xycoords="data",
+        xytext=(0.7, 0.1),
+        textcoords="axes fraction",
+        arrowprops={"arrowstyle": "->", "ec": "grey"},
+        ha="right",
+        bbox={
+            "boxstyle": "square",
+            "fc": "white",
+            "ec": "darkorange",
+            "pad": 0.3,
+        },
+    )
+
+else:
+    ax3.text(x=0.1, y=0.15, s=chart_text)
+    ax3.text(x=0.1, y=0.1, s=weights_text)
+
+equipf_ret, equipf_std = pf3.calc_pf3a_metrics(
+    assets=[bond20y, smallcaps, gold],
+    weights=[1 / 3, 1 / 3, 1 / 3],
+    correlations=[corr12, corr13, corr23],
+)
+equi_label = f"Cartera equiponderada\n   Riesgo = {round(equipf_std * 100, 1)}%\n   Rentab = {round(equipf_ret * 100, 1)}%"
+ax3.scatter(
+    # max_risk,
+    equipf_std,
+    equipf_ret,
+    c="magenta",
+    marker="s",
     zorder=6,
-    # label=f"Cartera riesgo {round(max_risk * 100, 1)} %",
+    label=equi_label,
 )
+ax3.legend()
+st.pyplot(fig3, width="stretch")
 
-weights_text = f"""{asset_a.name} = {round(w_a * 100)} % \n{asset_b.name} = {round(w_b * 100)} %"""
+st.write("Recordemos las métricas de los activos que componen la cartera:")
 
-ax4.annotate(
-    weights_text,
-    xy=(std_ab, avg_ab),
-    xycoords="data",
-    xytext=(0.7, 0.1),
-    textcoords="axes fraction",
-    arrowprops={"arrowstyle": "->", "ec": "grey"},
-    bbox={"boxstyle": "square", "fc": "white", "ec": "darkorange", "pad": 0.3},
-)
+metrics_table = f"""
+|         |Rentabilidad                    |Volatilidad                       |
+|---------|--------------------------------|----------------------------------|
+|Bonos LP |{round(bond20y.avg * 100, 1)}%  |{round(bond20y.std * 100, 1)}%    |
+|SmallCaps|{round(smallcaps.avg * 100, 1)}%|{round(smallcaps.std * 100, 1)}%  |
+|Oro      |{round(gold.avg * 100, 1)}%     |{round(gold.std * 100, 1)}%       |
+"""
 
-st.pyplot(fig4, width="stretch")
+corr_table = f"""
+|CORRELACIÓN  |Bonos LP |SmallCaps|Oro|
+|-------------|---------|---------|--------|
+|**Bonos LP** |1        |{corr12} |{corr13}|
+|**SmallCaps**|{corr12} |1        |{corr23}|
+|**Oro**      |{corr13} |{corr23} |1       |
+"""
+col_a, col_b = st.columns([3, 4])
+with col_a:
+    st.markdown(metrics_table)
+with col_b:
+    st.markdown(corr_table)
+
+text = """
+Fijémonos en una consecuencia importante de las carteras Markowitz: el hecho de tener correlaciones negativas nos permite construir una cartera con un riesgo como el de los Bonos LP pero con rentabilidades como las de las Small Caps o el Oro.
+"""
+st.write("")
+st.markdown(text)
+
 
 # === EQUALIZER ==================================================
 st.markdown("## Equalizer")
@@ -574,3 +559,119 @@ st.pyplot(fig5, width="stretch")
 
 # --- COPYRIGHT & DISCLAIMER
 utils.footnote()
+
+
+# ===================================================================
+# # === MARKOWITZ CALCULATOR ========================================
+# ===================================================================
+# st.markdown("## Calculadora Markowitz")
+# col_a1, _, col_a2 = st.columns([3, 0.5, 3])
+# with col_a1:
+#     # st.write(" ")
+#     std_a = st.slider(
+#         label="**Volatilidad Activo A**",
+#         min_value=1,
+#         max_value=50,
+#         value=10,
+#         step=1,
+#         format="%d%%",
+#         # label_visibility="collapsed",
+#     )
+#     std_b = st.slider(
+#         label="**Volatilidad Activo B**",
+#         min_value=1,
+#         max_value=50,
+#         value=25,
+#         step=1,
+#         format="%d%%",
+#         # label_visibility="collapsed",
+#     )
+#     corr_ab = st.slider(
+#         label="**Correlación A y B**",
+#         min_value=-1.0,
+#         max_value=1.0,
+#         value=0.5,
+#         step=0.1,
+#         format="%0.1f",
+#         # label_visibility="collapsed",
+#     )
+
+# with col_a2:
+#     # st.write(" ")
+#     avg_a = st.slider(
+#         label="**Rentabilidad Activo A**",
+#         min_value=1,
+#         max_value=30,
+#         value=10,
+#         step=1,
+#         format="%d%%",
+#         # label_visibility="collapsed",
+#     )
+#     avg_b = st.slider(
+#         label="**Rentabilidad Activo B**",
+#         min_value=1,
+#         max_value=30,
+#         value=25,
+#         step=1,
+#         format="%d%%",
+#         # label_visibility="collapsed",
+#     )
+#     min_std, *_ = ef2.pf_2a_min_volatility(std_a, std_b, corr_ab)
+#     max_std = max(std_a, std_b)
+#     pf_max_std = st.slider(
+#         label="**Cartera: máxima volatilidad permitida**",
+#         min_value=round(min_std),
+#         max_value=round(max_std),
+#         value=round((min_std + max_std) / 2),
+#         step=1,
+#         format="%d%%",
+#         # label_visibility="collapsed",
+#     )
+
+# asset_a = Asset(name="Activo A", avg=avg_a / 100, std=std_a / 100)
+# asset_b = Asset(name="Activo B", avg=avg_b / 100, std=std_b / 100)
+
+# w_a, w_b = ef2.pf_2a_optimal_weights(
+#     asset1=asset_a, asset2=asset_b, corr=corr_ab, target_vol=pf_max_std / 100
+# )
+
+# std_ab, avg_ab = ef2.pf_2a_risk_return(w_a, asset_a, asset_b, corr_ab)
+
+# fig4, ax4 = plt.subplots(figsize=(9, 6))
+
+# ax4 = ef2.pf_2a_plot_frontier(
+#     asset_1=asset_a,
+#     asset_2=asset_b,
+#     correlation=corr_ab,
+#     ax=ax4,
+#     plot_title="Calculadora Markowitz",
+#     efficient_label="",
+#     inefficient_label="",
+#     x_axis_label="Riesgo",
+#     y_axis_label="Rentabilidad",
+#     min_variance_label="",
+# )
+# ax3.set_xlim(0.0)
+
+# ax4.scatter(
+#     std_ab,
+#     avg_ab,
+#     c="darkorange",
+#     marker="D",
+#     zorder=6,
+#     # label=f"Cartera riesgo {round(max_risk * 100, 1)} %",
+# )
+
+# weights_text = f"""{asset_a.name} = {round(w_a * 100)} % \n{asset_b.name} = {round(w_b * 100)} %"""
+
+# ax4.annotate(
+#     weights_text,
+#     xy=(std_ab, avg_ab),
+#     xycoords="data",
+#     xytext=(0.7, 0.1),
+#     textcoords="axes fraction",
+#     arrowprops={"arrowstyle": "->", "ec": "grey"},
+#     bbox={"boxstyle": "square", "fc": "white", "ec": "darkorange", "pad": 0.3},
+# )
+
+# st.pyplot(fig4, width="stretch")

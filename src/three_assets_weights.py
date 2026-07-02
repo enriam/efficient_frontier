@@ -1,68 +1,88 @@
-from dataclasses import dataclass
+# ruff: noqa: E501
+
+from collections.abc import Sequence
 
 import numpy as np
 from scipy.optimize import minimize
 
-
-@dataclass(frozen=False)
-class Asset:
-    ret: float  # mean
-    volat: float  # stdev
+from src.asset import Asset
 
 
-def calculate_markowitz_weights_three_assets(
-    assets: list[Asset],
-    correlations: list[float],
-    max_portfolio_volat: float,
-) -> tuple[list[float], float]:
+def weights_3a_with_max_volatility(
+    assets: Sequence[Asset],
+    correlations: Sequence[float],
+    max_volatility: float,
+) -> dict[str, float | np.ndarray]:
     """
-    Calculate the optimal long-only Markowitz portfolio for three assets.
+    Calculate the optimal long-only weights for a three-asset portfolio subject
+    to a maximum portfolio volatility constraint.
 
-    The function maximizes expected portfolio return subject to:
-    - weights summing to 1
-    - weights between 0 and 1
-    - portfolio volatility <= max_portfolio_volat
+    The function maximizes the expected portfolio return under these constraints:
+    - The portfolio has exactly three assets.
+    - The weights must sum to 1.
+    - Each weight must be between 0 and 1.
+    - The portfolio volatility must be less than or equal to max_volatility.
 
     Parameters
     ----------
     assets:
-        List with 3 objects Asset: [asset1, asset2, asset3].
-    correlations:
-        List with correlations: [corr12, corr13, corr23].
-    max_portfolio_volat:
-        Maximum portfolio volatility accepted by the investor.
+        Sequence of three Asset objects. Each asset must have:
+        - name: asset name.
+        - avg: expected return or historical mean return.
+        - std: standard deviation.
+
+    corr12:
+        Correlation between asset 1 and asset 2.
+
+    corr13:
+        Correlation between asset 1 and asset 3.
+
+    corr23:
+        Correlation between asset 2 and asset 3.
+
+    max_volatility:
+        Maximum allowed portfolio volatility.
 
     Returns
     -------
-    tuple[list[float], float]
-        Optimal weights [w1, w2, w3] and expected portfolio return.
+    dict[str, float | np.ndarray]
+        Dictionary containing:
+        - weights: optimal portfolio weights.
+        - portfolio_return: expected return of the optimal portfolio.
+        - portfolio_volatility: volatility of the optimal portfolio.
     """
 
-    num_assets = 3
-    if len(assets) != num_assets:
-        msg = "assets must contain exactly 3 Asset objects."
+    if len(assets) != 3:  # noqa: PLR2004
+        msg = "Exactly three assets are required."
         raise ValueError(msg)
 
-    if len(correlations) != num_assets:
-        msg = "correlations must contain exactly 3 values."
+    if max_volatility < 0:
+        msg = "Maximum volatility must be non-negative."
         raise ValueError(msg)
 
-    if max_portfolio_volat < 0:
-        msg = "max_portfolio_volat must be non-negative."
+    corr12 = correlations[0]
+    corr13 = correlations[1]
+    corr23 = correlations[2]
+
+    if not -1 <= corr12 <= 1:
+        msg = "corr12 must be between -1 and 1."
         raise ValueError(msg)
 
-    returns = np.array([asset.ret for asset in assets], dtype=float)
-    volats = np.array([asset.volat for asset in assets], dtype=float)
-
-    if np.any(volats < 0):
-        msg = "Asset volatilities must be non-negative."
+    if not -1 <= corr13 <= 1:
+        msg = "corr13 must be between -1 and 1."
         raise ValueError(msg)
 
-    if any(corr < -1 or corr > 1 for corr in correlations):
-        msg = "Correlations must be between -1 and 1."
+    if not -1 <= corr23 <= 1:
+        msg = "corr23 must be between -1 and 1."
         raise ValueError(msg)
 
-    corr12, corr13, corr23 = correlations
+    means = np.array([asset.avg for asset in assets])
+    stds = np.array([asset.std for asset in assets])
+
+    if np.any(stds < 0):
+        msg = "Asset standard deviations must be non-negative."
+        raise ValueError(msg)
+
     correlation_matrix = np.array(
         [
             [1.0, corr12, corr13],
@@ -71,51 +91,194 @@ def calculate_markowitz_weights_three_assets(
         ]
     )
 
-    epsilon = -1e-10
-    if np.any(np.linalg.eigvalsh(correlation_matrix) < epsilon):
-        msg = "The correlation matrix is not valid."
+    eigenvalues = np.linalg.eigvalsh(correlation_matrix)
+
+    epsilon = 1e-10
+    if np.any(eigenvalues < -epsilon):
+        msg = "The correlations do not define a valid correlation matrix."
         raise ValueError(msg)
 
-    covariance_matrix = np.outer(volats, volats) * correlation_matrix
+    covariance_matrix = np.outer(stds, stds) * correlation_matrix
 
-    def portfolio_return(weights: np.ndarray) -> float:
-        return float(weights @ returns)
+    eigenvalues = np.linalg.eigvalsh(covariance_matrix)
 
-    def portfolio_volat(weights: np.ndarray) -> float:
-        return float(np.sqrt(weights @ covariance_matrix @ weights))
+    if np.any(eigenvalues < -epsilon):
+        msg = "The covariance matrix is not positive semidefinite."
+        raise ValueError(msg)
 
-    def negative_portfolio_return(weights: np.ndarray) -> float:
+    def portfolio_return(weights):
+        return weights @ means
+
+    def portfolio_variance(weights):
+        return weights @ covariance_matrix @ weights
+
+    def portfolio_volatility(weights):
+        return np.sqrt(max(portfolio_variance(weights), 0))
+
+    def negative_portfolio_return(weights):
         return -portfolio_return(weights)
 
-    constraints = [
-        {
-            "type": "eq",
-            "fun": lambda weights: np.sum(weights) - 1.0,
-        },
-        {
-            "type": "ineq",
-            "fun": lambda weights: (
-                max_portfolio_volat - portfolio_volat(weights)
-            ),
-        },
-    ]
+    bounds = [(0, 1), (0, 1), (0, 1)]
 
-    bounds = [(0.0, 1.0), (0.0, 1.0), (0.0, 1.0)]
+    sum_constraint = {
+        "type": "eq",
+        "fun": lambda weights: np.sum(weights) - 1,
+    }
+
+    volatility_constraint = {
+        "type": "ineq",
+        "fun": lambda weights: max_volatility - portfolio_volatility(weights),
+    }
+
     initial_weights = np.array([1 / 3, 1 / 3, 1 / 3])
+
+    min_volatility_result = minimize(
+        portfolio_variance,
+        initial_weights,
+        method="SLSQP",
+        bounds=bounds,
+        constraints=[sum_constraint],
+    )
+
+    if not min_volatility_result.success:
+        msg = "Minimum-volatility portfolio optimization failed."
+        raise RuntimeError(msg)
+
+    min_volatility = portfolio_volatility(min_volatility_result.x)
+
+    if max_volatility < min_volatility - 1e-10:
+        msg = "No feasible portfolio exists for the given maximum volatility."
+        raise ValueError(msg)
 
     result = minimize(
         negative_portfolio_return,
         initial_weights,
         method="SLSQP",
         bounds=bounds,
-        constraints=constraints,
+        constraints=[sum_constraint, volatility_constraint],
     )
 
     if not result.success:
-        msg = f"Optimization failed: {result.message}"
+        msg = "Optimal portfolio optimization failed."
+        raise RuntimeError(msg)
+
+    weights = result.x
+    portfolio_return_value = portfolio_return(weights)
+    portfolio_volatility_value = portfolio_volatility(weights)
+
+    return {
+        "weights": weights,
+        "portfolio_return": portfolio_return_value,
+        "portfolio_volatility": portfolio_volatility_value,
+    }
+
+
+def global_min_volatility_3a(
+    stds: Sequence[float],
+    correlations: Sequence[float],
+) -> dict[str, float | np.ndarray]:
+    """
+    Calculate the minimum possible volatility of a long-only three-asset portfolio.
+
+    The function minimizes portfolio variance subject to:
+    - The portfolio has exactly three assets.
+    - The weights must sum to 1.
+    - Each weight must be between 0 and 1.
+
+    Parameters
+    ----------
+    stds:
+        Sequence with the standard deviations of the three assets.
+
+    corr12:
+        Correlation between asset 1 and asset 2.
+
+    corr13:
+        Correlation between asset 1 and asset 3.
+
+    corr23:
+        Correlation between asset 2 and asset 3.
+
+    Returns
+    -------
+    dict[str, float | np.ndarray]
+        Dictionary containing:
+        - weights: weights of the minimum-volatility portfolio.
+        - volatility: minimum portfolio volatility.
+        - variance: minimum portfolio variance.
+        - covariance_matrix: covariance matrix used in the calculation.
+    """
+
+    num_assets = 3
+    if len(stds) != num_assets:
+        msg = "Exactly three standard deviations are required."
         raise ValueError(msg)
 
-    optimal_weights = result.x
-    optimal_return = portfolio_return(optimal_weights)
+    stds = np.array(stds, dtype=float)
 
-    return optimal_weights.tolist(), optimal_return
+    if np.any(stds < 0):
+        msg = "Standard deviations must be non-negative."
+        raise ValueError(msg)
+
+    corr12 = correlations[0]
+    corr13 = correlations[1]
+    corr23 = correlations[2]
+
+    if not -1 <= corr12 <= 1:
+        msg = "corr12 must be between -1 and 1."
+        raise ValueError(msg)
+
+    if not -1 <= corr13 <= 1:
+        msg = "corr13 must be between -1 and 1."
+        raise ValueError(msg)
+
+    if not -1 <= corr23 <= 1:
+        msg = "corr23 must be between -1 and 1."
+        raise ValueError(msg)
+
+    correlation_matrix = np.array(
+        [
+            [1.0, corr12, corr13],
+            [corr12, 1.0, corr23],
+            [corr13, corr23, 1.0],
+        ]
+    )
+
+    eigenvalues = np.linalg.eigvalsh(correlation_matrix)
+
+    epsilon = 1e-10
+    if np.any(eigenvalues < -epsilon):
+        msg = "The correlations do not define a valid correlation matrix."
+        raise ValueError(msg)
+
+    covariance_matrix = np.outer(stds, stds) * correlation_matrix
+
+    def portfolio_variance(weights):
+        return weights @ covariance_matrix @ weights
+
+    bounds = [(0, 1), (0, 1), (0, 1)]
+
+    sum_constraint = {
+        "type": "eq",
+        "fun": lambda weights: np.sum(weights) - 1,
+    }
+
+    initial_weights = np.array([1 / 3, 1 / 3, 1 / 3])
+
+    result = minimize(
+        portfolio_variance,
+        initial_weights,
+        method="SLSQP",
+        bounds=bounds,
+        constraints=[sum_constraint],
+    )
+
+    if not result.success:
+        msg = "Minimum-volatility portfolio optimization failed."
+        raise RuntimeError(msg)
+
+    weights = result.x
+    variance = portfolio_variance(weights)
+    # volatility = np.sqrt(max(variance, 0))
+
+    return np.sqrt(max(variance, 0))

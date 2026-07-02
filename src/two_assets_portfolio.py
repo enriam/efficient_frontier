@@ -193,9 +193,7 @@ def scatter_pf(pf_risk, pf_return, ax, **kwargs):
     ax.legend()
 
 
-def pf_2a_optimal_weights_long_only(
-    asset1, asset2, corr, target_vol, tol=1e-12
-):
+def pf_2a_optimal_weights(asset1, asset2, corr, target_vol, tol=1e-12):
     """
     Calcula los pesos óptimos long-only de una cartera de dos activos
     con una volatilidad máxima target_vol.

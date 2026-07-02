@@ -20,11 +20,15 @@ def plot_3a_frontier(  # noqa: PLR0913
     num_portfolios: int = 10_000,
     **kwargs: Any,
 ) -> Axes:
-    # asset1_label = kwargs.get("asset1_label", "Asset 1")
-    # asset2_label = kwargs.get("asset2_label", "Asset 2")
-    # asset3_label = kwargs.get("asset3_label", "Asset 3")
+
+    show_assets = kwargs.get("show_assets", True)
+    asset_labels = kwargs.get(
+        "asset_labels", ["Asset 1", "Asset 2", "Asset 3"]
+    )
+    asset_colors = kwargs.get("asset_colors", ["green", "red", "orange"])
+
     efficient_label = kwargs.get("efficient_label", "Efficient frontier")
-    inefficient_label = kwargs.get("inefficient_label", "Efficient frontier")
+    inefficient_label = kwargs.get("inefficient_label", "Inefficient frontier")
     min_variance_label = kwargs.get(
         "min_variance_label",
         "Minimum variance portfolio",
@@ -37,9 +41,6 @@ def plot_3a_frontier(  # noqa: PLR0913
         "Three-Asset Portfolio Efficient Frontier",
     )
 
-    # asset1_color = kwargs.get("asset1_color", "red")
-    # asset2_color = kwargs.get("asset2_color", "orange")
-    # asset3_color = kwargs.get("asset3_color", "green")
     frontier_color = kwargs.get("frontier_color", "steelblue")
     min_variance_color = kwargs.get("min_variance_color", "blue")
     portfolio_cloud_color = kwargs.get("portfolio_cloud_color", "lightgray")
@@ -63,21 +64,9 @@ def plot_3a_frontier(  # noqa: PLR0913
     if ax is None:
         _, ax = plt.subplots(figsize=(9, 6))
 
-    means = np.array(
-        [
-            asset_1.avg,
-            asset_2.avg,
-            asset_3.avg,
-        ]
-    )
+    means = np.array([asset_1.avg, asset_2.avg, asset_3.avg])
 
-    stds = np.array(
-        [
-            asset_1.std,
-            asset_2.std,
-            asset_3.std,
-        ]
-    )
+    stds = np.array([asset_1.std, asset_2.std, asset_3.std])
 
     correlation_matrix = np.array(
         [
@@ -136,29 +125,30 @@ def plot_3a_frontier(  # noqa: PLR0913
         label=efficient_label,
     )
 
-    # ax.scatter(
-    #     asset_1.volat,
-    #     asset_1.ret,
-    #     color=asset1_color,
-    #     label=asset1_label,
-    #     zorder=3,
-    # )
+    if show_assets:
+        ax.scatter(
+            asset_1.std,
+            asset_1.avg,
+            color=asset_colors[0],
+            label=asset_labels[0],
+            zorder=3,
+        )
 
-    # ax.scatter(
-    #     asset_2.volat,
-    #     asset_2.ret,
-    #     color=asset2_color,
-    #     label=asset2_label,
-    #     zorder=3,
-    # )
+        ax.scatter(
+            asset_2.std,
+            asset_2.avg,
+            color=asset_colors[1],
+            label=asset_labels[1],
+            zorder=3,
+        )
 
-    # ax.scatter(
-    #     asset_3.volat,
-    #     asset_3.ret,
-    #     color=asset3_color,
-    #     label=asset3_label,
-    #     zorder=3,
-    # )
+        ax.scatter(
+            asset_3.std,
+            asset_3.avg,
+            color=asset_colors[2],
+            label=asset_labels[2],
+            zorder=3,
+        )
 
     ax.scatter(
         portfolio_risks[min_variance_index],
@@ -173,8 +163,8 @@ def plot_3a_frontier(  # noqa: PLR0913
     ax.set_title(plot_title)
 
     if format_as_percent:
-        ax.xaxis.set_major_formatter(PercentFormatter(xmax=1.0))
-        ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
+        ax.xaxis.set_major_formatter(PercentFormatter(xmax=1.0, decimals=1))
+        ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0, decimals=1))
 
     ax.legend()
     ax.grid(visible=True, alpha=0.3)
